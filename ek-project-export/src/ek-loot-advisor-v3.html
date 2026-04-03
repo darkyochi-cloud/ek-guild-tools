@@ -218,7 +218,7 @@ body { background:#0f0f23; color:#e0e0e0; font-family:'Segoe UI',sans-serif; }
 <!-- ========== STEP 1: ROSTER ========== -->
 <div id="s1" class="step active">
   <div class="roster-controls">
-    <button class="btn btn-primary" id="btnLoadRoster">📥 Cargar desde RaidForge</button>
+    <button class="btn btn-primary" id="btnLoadRoster">🔄 Sync Blizzard</button>
     <button class="btn btn-sm" id="btnImportJSON" style="background:#3498db;color:#fff;">📂 Importar JSON</button>
     <button class="btn btn-sm" id="btnExportJSON" style="background:#555;color:#fff;" title="Exportar roster actual">💾 Exportar</button>
     <input type="file" id="jsonFileInput" accept=".json" style="display:none">
@@ -628,6 +628,18 @@ window.initWeightSliders = function() {
 // ===== DROPTIMIZER BACKEND URL =====
 // Paste your Google Apps Script Web App URL here to enable auto-sync
 const BACKEND_URL = '';  // <-- PASTE YOUR APPS SCRIPT URL HERE
+
+// ===== BLIZZARD API CONFIG =====
+const BLIZZARD_CLIENT_ID     = 'a9bac31a3ba249c9a0d0850c6fa34ed8';
+const BLIZZARD_CLIENT_SECRET = 'tGYtfPGFQ9BV56kYa1BrqK7MOowi28Vh';
+const BLIZZARD_REGION        = 'us';
+const BLIZZARD_GUILD_REALM   = 'ragnaros';
+const BLIZZARD_GUILD_NAME    = 'eternal-karma';
+const BLIZZARD_LOCALE        = 'es_MX';
+// Rangos que se incluyen en el roster (0=GM, ajusta según tu guild)
+// Consulta tus rangos en: https://www.wowhead.com/guild=
+const BLIZZARD_INCLUDED_RANKS = [0, 1, 2, 3, 4, 5]; // incluye todos por default
+const ROSTER_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
 
 // ===== DROPTIMIZER DATA (persisted in localStorage) =====
 window.droptimizerData = JSON.parse(localStorage.getItem('ek_droptimizer') || '{}');
@@ -1625,64 +1637,159 @@ async function fetchGear(name, realm, region) {
   } catch(e) { return null; }
 }
 
-// ===== LOAD FROM API =====
-const RF_BASE = (window.location.hostname.includes('github.io') || window.location.protocol === 'file:')
-  ? 'https://wowmythic-2bavpmkc.manus.space'
-  : '';
-window.loadFromAPI = async function() {
-  toast('Cargando roster desde RaidForge...', null);
-  try {
-    const url = RF_BASE + '/api/trpc/characters.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3Anull%7D%7D';
-    const r = await fetch(url);
-    const d = await r.json();
-    const chars = d[0]?.result?.data?.json || [];
-    const roster = chars.map(c => {
-      const cl = CMAP[c.className] || c.className;
-      const stats = CD[cl] ? CD[cl].stats : ['any'];
-      const spec = c.specOverride || c.spec;
-      let role = 'dps';
-      if (['Blood','Vengeance','Guardian','Brewmaster','Protection'].includes(spec)) role = 'tank';
-      else if (['Restoration','Preservation','Mistweaver','Holy','Discipline'].includes(spec)) role = 'healer';
-      else if (spec === 'Augmentation') role = 'support';
-      const rank = c.rank || '';
-      const isMain = !rank.toLowerCase().includes('alt');
-      return {
-        id:c.id, uid:String(c.id||c.name+'_'+Math.random().toString(36).slice(2,6)), nm:c.name, cl, sp:spec, cN:c.className, sN:spec,
-        arm:CD[cl]?.armor||'cloth', role, pSt:stats[0]||'int',
-        il:c.itemLevel||0, wc:c.wclHeroicAvg||0, at:90, on:true,
-        realm:c.realm||'illidan', region:c.region||'us',
-        rank, owner:c.owner||c.name, isMain
-      };
-    });
-    window.roster = roster;
-    window.selectedPlayers.clear();
-    const mainCount = roster.filter(p => p.isMain).length;
-    const altCount = roster.filter(p => !p.isMain).length;
-    if (mainCount > 0 && altCount > 0) {
-      roster.filter(p => p.isMain).forEach(p => window.selectedPlayers.add(p.uid||p.nm));
-    } else {
-      roster.forEach(p => window.selectedPlayers.add(p.uid||p.nm));
-    }
-    renderRoster();
-    toast('Roster: '+mainCount+' mains, '+altCount+' alts. Cargando gear...', true);
+// ===== BLIZZARD API — TOKEN =====
+async function getBlizzardToken() {
+  const cached = JSON.parse(localStorage.getItem('ek_bnet_token') || 'null');
+  if (cached && cached.expires > Date.now()) return cached.token;
+  const resp = await fetch(`https://${BLIZZARD_REGION}.battle.net/oauth/token`, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Basic ' + btoa(BLIZZARD_CLIENT_ID + ':' + BLIZZARD_CLIENT_SECRET),
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: 'grant_type=client_credentials'
+  });
+  if (!resp.ok) throw new Error('No se pudo obtener token de Blizzard: ' + resp.status);
+  const data = await resp.json();
+  localStorage.setItem('ek_bnet_token', JSON.stringify({
+    token: data.access_token,
+    expires: Date.now() + (data.expires_in - 60) * 1000
+  }));
+  return data.access_token;
+}
 
-    let gearLoaded = 0;
-    const batch = 5;
-    for (let i = 0; i < roster.length; i += batch) {
-      const slice = roster.slice(i, i+batch);
-      const results = await Promise.all(slice.map(p => fetchGear(p.nm, p.realm, p.region)));
-      results.forEach((gear, j) => { if(gear){roster[i+j].gear=gear; gearLoaded++;} });
-      updateRosterStats();
-    }
-    toast('Gear cargado: '+gearLoaded+'/'+roster.length, true);
-  } catch(e) {
-    if (window.location.hostname.includes('github.io') || window.location.protocol === 'file:') {
-      toast('⚠️ CORS bloqueado — usa "Importar JSON" con un archivo exportado desde RaidForge, o abre la app directo en manus.space', false);
-    } else {
-      toast('Error: '+e.message, false);
+// ===== BLIZZARD API — GUILD ROSTER =====
+async function fetchBlizzardGuildRoster(token) {
+  const url = `https://${BLIZZARD_REGION}.api.blizzard.com/data/wow/guild/${BLIZZARD_GUILD_REALM}/${BLIZZARD_GUILD_NAME}/roster?namespace=profile-${BLIZZARD_REGION}&locale=${BLIZZARD_LOCALE}`;
+  const resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!resp.ok) throw new Error('Error al obtener roster de guild: ' + resp.status);
+  return await resp.json();
+}
+
+// ===== BLIZZARD API — CHARACTER SUMMARY =====
+async function fetchBlizzardCharacter(token, name, realm) {
+  try {
+    const url = `https://${BLIZZARD_REGION}.api.blizzard.com/profile/wow/character/${realm}/${name.toLowerCase()}?namespace=profile-${BLIZZARD_REGION}&locale=${BLIZZARD_LOCALE}`;
+    const resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch(e) { return null; }
+}
+
+// ===== BLIZZARD RANK NAME MAP =====
+const BLIZZARD_RANK_NAMES = {
+  0: 'Guild Master', 1: 'Officer', 2: 'Raider', 3: 'Raider',
+  4: 'Trial', 5: 'Alt', 6: 'Alt', 7: 'Social'
+};
+
+// ===== UPDATE SYNC BUTTON =====
+function updateSyncButton(timestamp) {
+  const btn = document.getElementById('btnLoadRoster');
+  if (!btn || !timestamp) return;
+  const d = new Date(timestamp);
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  const dd = `${d.getDate()}/${d.getMonth()+1}`;
+  btn.title = `Ultimo sync: ${dd} ${hh}:${mm}`;
+}
+
+// ===== LOAD FROM BLIZZARD (cache 24h) =====
+window.loadFromAPI = async function(forceRefresh = false) {
+  if (!forceRefresh) {
+    const cacheTime = parseInt(localStorage.getItem('ek_roster_cache_time') || '0');
+    const cached = localStorage.getItem('ek_roster');
+    if (cached && Date.now() - cacheTime < ROSTER_CACHE_TTL_MS) {
+      const roster = JSON.parse(cached);
+      window.roster = roster;
+      window.selectedPlayers.clear();
+      roster.filter(p => p.isMain).forEach(p => window.selectedPlayers.add(p.uid||p.nm));
+      if (window.selectedPlayers.size === 0) roster.forEach(p => window.selectedPlayers.add(p.uid||p.nm));
+      renderRoster();
+      const mins = Math.round((Date.now() - cacheTime) / 60000);
+      const timeStr = mins < 60 ? mins + 'm' : Math.round(mins/60) + 'h';
+      toast('Roster desde cache (hace ' + timeStr + ') — ' + roster.length + ' personajes', true);
+      updateSyncButton(cacheTime);
+      return;
     }
   }
+  const btn = document.getElementById('btnLoadRoster');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando...'; }
+  toast('Conectando con Blizzard API...', null);
+  try {
+    const token = await getBlizzardToken();
+    toast('Token OK — obteniendo roster de la guild...', null);
+    const guildData = await fetchBlizzardGuildRoster(token);
+    const members = (guildData.members || []).filter(m => BLIZZARD_INCLUDED_RANKS.includes(m.rank));
+    toast('Guild: ' + members.length + ' miembros. Cargando perfiles...', null);
+    const roster = [];
+    const batchSize = 8;
+    let loaded = 0;
+    for (let i = 0; i < members.length; i += batchSize) {
+      const slice = members.slice(i, i + batchSize);
+      const profiles = await Promise.all(slice.map(m =>
+        fetchBlizzardCharacter(token, m.character.name, m.character.realm.slug)
+      ));
+      slice.forEach((m, j) => {
+        const profile = profiles[j];
+        const charName = m.character.name;
+        const rankNum = m.rank;
+        const rankName = BLIZZARD_RANK_NAMES[rankNum] || ('Rango ' + rankNum);
+        const isMain = rankNum <= 4 && !rankName.toLowerCase().includes('alt');
+        let cl = 'Unknown', spec = 'Unknown', role = 'dps', arm = 'cloth', il = 0;
+        if (profile) {
+          const className = profile.character_class?.name || 'Unknown';
+          cl = CMAP[className] || className;
+          spec = profile.active_spec?.name || 'Unknown';
+          il = profile.equipped_item_level || profile.average_item_level || 0;
+          if (['Blood','Vengeance','Guardian','Brewmaster','Protection'].includes(spec)) role = 'tank';
+          else if (['Restoration','Preservation','Mistweaver','Holy','Discipline'].includes(spec)) role = 'healer';
+          else if (spec === 'Augmentation') role = 'support';
+          arm = CD[cl]?.armor || 'cloth';
+        }
+        const stats = CD[cl] ? CD[cl].stats : ['any'];
+        roster.push({
+          id: m.character.id,
+          uid: String(m.character.id || charName + '_' + rankNum),
+          nm: charName, cl, sp: spec, cN: cl, sN: spec,
+          arm, role, pSt: stats[0] || 'int',
+          il, wc: 0, at: 90, on: true,
+          realm: m.character.realm.slug || BLIZZARD_GUILD_REALM,
+          region: BLIZZARD_REGION,
+          rank: rankName, rankNum, owner: charName, isMain
+        });
+        loaded++;
+      });
+      const pct = Math.min(Math.round((i + batchSize) / members.length * 100), 100);
+      toast('Cargando perfiles... ' + pct + '% (' + loaded + '/' + members.length + ')', null);
+    }
+    localStorage.setItem('ek_roster', JSON.stringify(roster));
+    localStorage.setItem('ek_roster_cache_time', String(Date.now()));
+    window.roster = roster;
+    window.selectedPlayers.clear();
+    const mains = roster.filter(p => p.isMain);
+    const alts = roster.filter(p => !p.isMain);
+    mains.forEach(p => window.selectedPlayers.add(p.uid||p.nm));
+    if (window.selectedPlayers.size === 0) roster.forEach(p => window.selectedPlayers.add(p.uid||p.nm));
+    renderRoster();
+    updateSyncButton(Date.now());
+    toast('Blizzard sync completo — ' + mains.length + ' mains, ' + alts.length + ' alts', true);
+  } catch(e) {
+    toast('Error: ' + e.message, false);
+    console.error(e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Sync Blizzard'; }
+  }
 };
+
+// Auto-sync al cargar si cache > 24h o no existe
+window.addEventListener('DOMContentLoaded', () => {
+  const cacheTime = parseInt(localStorage.getItem('ek_roster_cache_time') || '0');
+  const cached = localStorage.getItem('ek_roster');
+  if (cached) updateSyncButton(cacheTime);
+  if (!cached || Date.now() - cacheTime > ROSTER_CACHE_TTL_MS) {
+    setTimeout(() => window.loadFromAPI(false), 800);
+  }
+});
 
 // ===== IMPORT / EXPORT ROSTER =====
 window.importRosterJSON = function(jsonData) {
@@ -2175,7 +2282,8 @@ document.getElementById('btnClearLoot').addEventListener('click', () => {
 });
 
 // Auto-load on manus.space
-if(window.location.hostname.includes('manus.space')) setTimeout(window.loadFromAPI, 500);
+if(window.location.hostname.includes('manus.space')) setTimeout(() => window.loadFromAPI(true), 500);
 </script>
 </body>
 </html>
+
