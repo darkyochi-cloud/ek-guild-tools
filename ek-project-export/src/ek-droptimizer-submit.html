@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eternal Karma — Droptimizer Submit</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:#0f0f23; color:#e0e0e0; font-family:'Segoe UI',sans-serif; min-height:100vh; display:flex; flex-direction:column; align-items:center; }
+.header { background:linear-gradient(90deg,#1a1a3e,#2d1b4e); width:100%; padding:20px; text-align:center; }
+.header .logo { display:inline-flex; align-items:center; gap:14px; }
+.header .logo-icon { width:48px; height:48px; background:#a335ee; border-radius:12px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:20px; color:#fff; }
+.header h1 { color:#ffd700; font-size:22px; }
+.header .sub { color:#888; font-size:13px; margin-top:4px; }
+.player-banner { background:linear-gradient(135deg,#2d1b4e,#1a1a3e); padding:16px 20px; border-bottom:2px solid #a335ee; text-align:center; width:100%; }
+.player-banner .name { color:#a335ee; font-size:28px; font-weight:bold; }
+.player-banner .realm { color:#888; font-size:14px; }
+.container { max-width:700px; width:100%; padding:24px 16px; }
+.card { background:#16213e; border:1px solid #333; border-radius:12px; padding:20px; margin-bottom:16px; }
+.card-title { color:#ffd700; font-size:16px; font-weight:bold; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.step-num { width:28px; height:28px; background:#a335ee; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:14px; color:#fff; flex-shrink:0; }
+input[type=url] { width:100%; background:#0d1b2a; border:1px solid #444; color:#fff; padding:12px 16px; border-radius:8px; font-size:14px; outline:none; }
+input:focus { border-color:#a335ee; }
+input::placeholder { color:#555; }
+.btn { border:none; padding:12px 24px; border-radius:8px; font-size:14px; font-weight:bold; cursor:pointer; transition:all 0.2s; }
+.btn:hover { transform:scale(1.03); }
+.btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+.btn-primary { background:linear-gradient(135deg,#a335ee,#7b2ff7); color:#fff; }
+.btn-green { background:linear-gradient(135deg,#2ecc40,#27ae60); color:#fff; }
+.btn-sm { padding:8px 16px; font-size:12px; }
+.status { padding:12px 16px; border-radius:8px; margin-top:12px; font-size:13px; display:none; }
+.status.ok { display:block; background:#1e3a1e; border:1px solid #2ecc40; color:#2ecc40; }
+.status.err { display:block; background:#3a1e1e; border:1px solid #e74c3c; color:#e74c3c; }
+.status.info { display:block; background:#1e2a3a; border:1px solid #3498db; color:#3498db; }
+.result-box { background:#0d1b2a; border:1px solid #a335ee; border-radius:8px; padding:16px; margin-top:16px; display:none; position:relative; }
+.result-box.show { display:block; }
+.result-summary .stat { color:#ffd700; font-weight:bold; }
+.code-area { background:#0a0a1a; border:1px solid #444; border-radius:8px; padding:12px; font-family:monospace; font-size:11px; color:#aaa; max-height:100px; overflow-y:auto; word-break:break-all; cursor:text; user-select:all; }
+.copy-btn { position:absolute; top:12px; right:12px; }
+.top-upgrades table { width:100%; border-collapse:collapse; font-size:12px; }
+.top-upgrades th { text-align:left; padding:6px 8px; color:#ffd700; border-bottom:1px solid #333; }
+.top-upgrades td { padding:6px 8px; border-bottom:1px solid #1a1a2e; }
+.gain-val { color:#2ecc40; font-weight:bold; }
+.footer { color:#555; font-size:11px; text-align:center; padding:24px; }
+.no-player { text-align:center; padding:60px 20px; }
+.no-player h2 { color:#e74c3c; margin-bottom:12px; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
+.loading { animation:pulse 1s ease-in-out infinite; }
+.manual-section { margin-top:16px; }
+.manual-section textarea { width:100%;min-height:100px;background:#0d1b2a;border:1px solid #444;color:#fff;padding:12px;border-radius:8px;font-size:12px;font-family:monospace;resize:vertical; }
+.submit-status { margin-top:12px; padding:12px 16px; border-radius:8px; font-size:13px; }
+.submit-status.sent { background:#1e3a1e; border:1px solid #2ecc40; color:#2ecc40; }
+.submit-status.sending { background:#1e2a3a; border:1px solid #3498db; color:#3498db; }
+.submit-status.failed { background:#3a1e1e; border:1px solid #e74c3c; color:#e74c3c; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">EK</div>
+    <div>
+      <h1>Droptimizer Submit</h1>
+      <div class="sub">Eternal Karma — Sube tu Droptimizer antes de la raid</div>
+    </div>
+  </div>
+</div>
+
+<div class="player-banner" id="playerBanner" style="display:none;">
+  <div class="name" id="playerDisplayName">—</div>
+  <div class="realm" id="playerRealm">Ragnaros-US</div>
+</div>
+
+<div class="container">
+
+  <!-- No player error -->
+  <div class="no-player" id="noPlayerMsg" style="display:none;">
+    <h2>Link invalido</h2>
+    <p style="color:#888;">Este link necesita un parametro <code style="color:#ff8844;">?player=TuNombre</code></p>
+    <p style="color:#666;margin-top:8px;">Pide tu link personalizado al Raid Leader.</p>
+  </div>
+
+  <!-- Main content -->
+  <div id="mainContent" style="display:none;">
+
+    <div class="card">
+      <div class="card-title"><div class="step-num">1</div> Corre tu Droptimizer</div>
+      <div style="color:#888;font-size:13px;line-height:1.6;margin-bottom:12px;">
+        Ve a <a href="https://www.raidbots.com/simbot/droptimizer" target="_blank" style="color:#3498db;">Raidbots Droptimizer</a>,
+        carga tu personaje, selecciona <b>Season 1 Raids &rarr; Mythic</b>, y corre la sim.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><div class="step-num">2</div> Pega la URL de tu reporte</div>
+      <input type="url" id="reportUrl" placeholder="https://www.raidbots.com/simbot/report/XXXXX..." autocomplete="off">
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button class="btn btn-primary" id="fetchBtn" onclick="fetchReport()">🔍 Extraer y Enviar</button>
+      </div>
+      <div class="status" id="fetchStatus"></div>
+    </div>
+
+    <!-- Results -->
+    <div class="result-box" id="resultBox">
+      <button class="btn btn-green btn-sm copy-btn" onclick="copyCode()">📋 Copiar Codigo</button>
+      <div class="result-summary">
+        <div style="margin-top:8px;">
+          Base DPS: <span class="stat" id="resBase">—</span> &nbsp;|&nbsp;
+          Upgrades: <span class="stat" id="resCount">—</span> &nbsp;|&nbsp;
+          Top: <span class="stat" id="resTop">—</span>
+        </div>
+      </div>
+      <!-- Backend submit status -->
+      <div id="backendStatus"></div>
+      <div class="top-upgrades" style="margin-top:12px;">
+        <table>
+          <thead><tr><th>#</th><th>Item</th><th>Slot</th><th>+DPS</th></tr></thead>
+          <tbody id="upgradeTable"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:16px;">
+        <div style="color:#ffd700;font-size:13px;font-weight:bold;margin-bottom:6px;">📦 Backup: tu codigo para Discord</div>
+        <div class="code-area" id="codeOutput"></div>
+      </div>
+    </div>
+
+    <!-- Manual fallback -->
+    <div class="card" id="manualCard" style="display:none;">
+      <div class="card-title">⚠️ Metodo Manual</div>
+      <div style="color:#888;font-size:13px;margin-bottom:8px;">
+        Si el fetch fallo, abre esta URL en tu navegador, selecciona todo (Ctrl+A), copia (Ctrl+C) y pega aqui:
+      </div>
+      <div style="background:#0d1b2a;padding:8px 12px;border-radius:6px;font-family:monospace;font-size:12px;color:#ff8844;margin-bottom:8px;word-break:break-all;" id="manualUrl"></div>
+      <div class="manual-section">
+        <textarea id="manualJson" placeholder="Pega el JSON del data.json aqui..."></textarea>
+        <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="parseManualJson()">📥 Procesar</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="footer">Eternal Karma Droptimizer Submit v3.0</div>
+
+<script>
+// ============================================================
+// BACKEND URL — Replace with your Google Apps Script Web App URL
+// ============================================================
+const BACKEND_URL = '';  // <-- PASTE YOUR APPS SCRIPT URL HERE
+
+// ===== GET PLAYER NAME FROM URL PARAM =====
+const params = new URLSearchParams(window.location.search);
+const playerParam = params.get('player');
+
+if (!playerParam) {
+  document.getElementById('noPlayerMsg').style.display = 'block';
+} else {
+  const playerName = playerParam.charAt(0).toUpperCase() + playerParam.slice(1).toLowerCase();
+  document.getElementById('playerBanner').style.display = 'block';
+  document.getElementById('playerDisplayName').textContent = playerName;
+  document.getElementById('mainContent').style.display = 'block';
+  document.title = 'EK Droptimizer — ' + playerName;
+}
+
+let extractedData = null;
+
+async function fetchReport() {
+  const urlInput = document.getElementById('reportUrl').value.trim();
+  const btn = document.getElementById('fetchBtn');
+  if (!urlInput) { showStatus('err', 'Pega una URL de Raidbots.'); return; }
+  const match = urlInput.match(/report\/([a-zA-Z0-9]+)/);
+  if (!match) { showStatus('err', 'URL no valida. Debe ser: raidbots.com/simbot/report/XXXXX'); return; }
+  const reportId = match[1];
+  const dataUrl = 'https://www.raidbots.com/reports/' + reportId + '/data.json';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading">⏳ Extrayendo...</span>';
+  showStatus('info', 'Conectando con Raidbots...');
+  try {
+    const resp = await fetch(dataUrl);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    processRaidbotsData(data, reportId, urlInput);
+    btn.disabled = false;
+    btn.innerHTML = '🔍 Extraer y Enviar';
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = '🔍 Extraer y Enviar';
+    showStatus('err', 'No se pudo acceder directamente (CORS). Usa el metodo manual abajo.');
+    document.getElementById('manualCard').style.display = 'block';
+    document.getElementById('manualUrl').textContent = dataUrl;
+  }
+}
+
+function parseManualJson() {
+  const text = document.getElementById('manualJson').value.trim();
+  if (!text) { showStatus('err', 'Pega el JSON del data.json'); return; }
+  try {
+    const data = JSON.parse(text);
+    const reportUrl = document.getElementById('reportUrl').value.trim();
+    const reportId = reportUrl.match(/report\/([a-zA-Z0-9]+)/)?.[1] || 'manual';
+    processRaidbotsData(data, reportId, reportUrl);
+  } catch(e) { showStatus('err', 'JSON invalido: ' + e.message); }
+}
+
+function processRaidbotsData(data, reportId, reportUrl) {
+  try {
+    const baseDps = data.sim.players[0].collected_data.dps.mean;
+    const profilesets = data.sim.profilesets.results;
+    const dropItems = data.simbot?.meta?.rawFormData?.droptimizerItems || [];
+    const itemLookup = {};
+    dropItems.forEach(e => { itemLookup[e.id] = { name: e.item?.name || '?', slot: e.slot || '?', ilvl: e.item?.itemLevel || 0 }; });
+
+    const upgrades = profilesets.map(p => {
+      const info = itemLookup[p.name] || {};
+      return { item: info.name || '?', slot: info.slot || '?', ilvl: info.ilvl || 0, gain: Math.round(p.mean - baseDps) };
+    }).filter(r => r.gain > 0).sort((a,b) => b.gain - a.gain);
+
+    // Deduplicate: keep best gain per item
+    const best = {};
+    upgrades.forEach(u => { const k = u.item.toLowerCase(); if (!best[k] || u.gain > best[k].gain) best[k] = u; });
+    const deduped = Object.values(best).sort((a,b) => b.gain - a.gain);
+
+    const displayName = playerParam.charAt(0).toUpperCase() + playerParam.slice(1).toLowerCase();
+    const pairs = deduped.map(u => u.item + ':' + u.gain);
+    const code = 'EK-DROP|' + displayName + '|' + Math.round(baseDps) + '|' + pairs.join(',');
+
+    extractedData = { player: displayName, baseDps: Math.round(baseDps), upgrades: deduped, code, reportUrl };
+    renderResults(extractedData);
+
+    // Auto-submit to backend
+    submitToBackend(extractedData);
+
+    showStatus('ok', '✅ ' + deduped.length + ' upgrades encontrados.');
+  } catch(e) { showStatus('err', 'Error procesando datos: ' + e.message); }
+}
+
+// ===== BACKEND SUBMISSION =====
+async function submitToBackend(d) {
+  const statusEl = document.getElementById('backendStatus');
+  if (!BACKEND_URL) {
+    statusEl.innerHTML = '<div class="submit-status sent">📦 Datos extraidos. Copia el codigo de abajo y pegalo en Discord #droptimizer.</div>';
+    return;
+  }
+  statusEl.innerHTML = '<div class="submit-status sending">⏳ Enviando al servidor de la guild...</div>';
+  try {
+    const resp = await fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },  // Apps Script needs text/plain to avoid CORS preflight
+      body: JSON.stringify({
+        player: d.player,
+        baseDps: d.baseDps,
+        upgrades: d.upgrades,
+        reportUrl: d.reportUrl || ''
+      })
+    });
+    const result = await resp.json();
+    if (result.ok) {
+      statusEl.innerHTML = '<div class="submit-status sent">✅ Enviado al servidor. El Raid Leader ya puede ver tus datos. (' + result.upgradeCount + ' upgrades)</div>';
+    } else {
+      throw new Error(result.error || 'Unknown error');
+    }
+  } catch(e) {
+    statusEl.innerHTML = '<div class="submit-status failed">⚠️ No se pudo enviar automaticamente. Copia el codigo de abajo y pegalo en Discord #droptimizer.</div>';
+  }
+}
+
+function renderResults(d) {
+  document.getElementById('resBase').textContent = d.baseDps.toLocaleString();
+  document.getElementById('resCount').textContent = d.upgrades.length;
+  document.getElementById('resTop').textContent = d.upgrades[0] ? '+' + d.upgrades[0].gain.toLocaleString() + ' (' + d.upgrades[0].item + ')' : '—';
+
+  const tbody = document.getElementById('upgradeTable');
+  tbody.innerHTML = d.upgrades.slice(0, 15).map((u, i) =>
+    '<tr><td style="color:#666;">' + (i+1) + '</td><td>' + u.item + '</td><td style="color:#888;">' + u.slot + '</td><td class="gain-val">+' + u.gain.toLocaleString() + '</td></tr>'
+  ).join('');
+  if (d.upgrades.length > 15) tbody.innerHTML += '<tr><td colspan="4" style="color:#555;text-align:center;">... y ' + (d.upgrades.length - 15) + ' mas</td></tr>';
+
+  document.getElementById('codeOutput').textContent = d.code;
+  document.getElementById('resultBox').classList.add('show');
+}
+
+function copyCode() {
+  if (!extractedData) return;
+  navigator.clipboard.writeText(extractedData.code).then(() => {
+    document.querySelector('.copy-btn').textContent = '✅ Copiado!';
+    setTimeout(() => { document.querySelector('.copy-btn').textContent = '📋 Copiar Codigo'; }, 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = extractedData.code;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    document.querySelector('.copy-btn').textContent = '✅ Copiado!';
+    setTimeout(() => { document.querySelector('.copy-btn').textContent = '📋 Copiar Codigo'; }, 2000);
+  });
+}
+
+function showStatus(type, msg) {
+  const el = document.getElementById('fetchStatus');
+  el.className = 'status ' + type;
+  el.textContent = msg;
+}
+
+document.getElementById('reportUrl')?.addEventListener('keydown', e => { if (e.key === 'Enter') fetchReport(); });
+</script>
+</body>
+</html>

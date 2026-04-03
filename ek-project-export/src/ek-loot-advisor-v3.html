@@ -1,0 +1,2181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EK Loot Advisor v3</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:#0f0f23; color:#e0e0e0; font-family:'Segoe UI',sans-serif; }
+.top-bar { background:linear-gradient(90deg,#1a1a3e,#2d1b4e); padding:12px 20px; display:flex; align-items:center; gap:14px; }
+.top-bar .logo { width:40px; height:40px; background:#a335ee; border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:16px; color:#fff; }
+.top-bar h1 { font-size:18px; color:#ffd700; }
+.top-bar .sub { color:#888; font-size:12px; }
+.tabs { display:flex; gap:0; margin:0 16px; }
+.tabs button { flex:1; padding:12px; border:none; cursor:pointer; font-size:14px; font-weight:bold; background:#16213e; color:#888; border-bottom:3px solid transparent; transition:all 0.2s; }
+.tabs button.on { background:#1a1a3e; color:#ffd700; border-bottom:3px solid #a335ee; }
+.tabs button:hover { color:#ccc; }
+.step { display:none; padding:16px; }
+.step.active { display:block; }
+
+/* Roster styles */
+.roster-controls { display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+.btn { border:none; padding:10px 20px; border-radius:8px; font-size:13px; font-weight:bold; cursor:pointer; transition:all 0.2s; }
+.btn:hover { transform:scale(1.03); }
+.btn-primary { background:linear-gradient(135deg,#2ecc40,#27ae60); color:#fff; }
+.btn-purple { background:linear-gradient(135deg,#a335ee,#7b2ff7); color:#fff; }
+.btn-orange { background:#ff8844; color:#fff; }
+.btn-sm { padding:6px 14px; font-size:12px; }
+.stats-bar { display:flex; gap:16px; background:#16213e; border-radius:8px; padding:10px 16px; margin-bottom:12px; font-size:13px; flex-wrap:wrap; }
+.stats-bar .lbl { color:#88aaff; }
+.stats-bar .val { color:#ffd700; font-weight:bold; }
+.player-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:8px; max-height:420px; overflow-y:auto; }
+.player-card { background:#16213e; border-radius:8px; padding:10px 12px; display:flex; align-items:center; gap:10px; cursor:pointer; border:2px solid transparent; transition:all 0.15s; }
+.player-card.selected { border-color:#a335ee; background:#1e1e4e; }
+.player-card:hover { border-color:#555; }
+.player-card .check { width:20px; height:20px; border-radius:4px; border:2px solid #555; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+.player-card.selected .check { background:#a335ee; border-color:#a335ee; }
+.player-card .info { flex:1; min-width:0; }
+.player-card .pname { font-weight:bold; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.player-card .pdetail { font-size:11px; color:#888; }
+.player-card .pilvl { font-size:12px; color:#88f; font-weight:bold; flex-shrink:0; }
+
+/* Boss & Loot styles */
+.boss-section { background:#1a1a2e; border:1px solid #333; border-radius:10px; padding:16px; margin-bottom:16px; }
+.boss-title { color:#ff8844; font-size:16px; font-weight:bold; margin-bottom:12px; }
+.input-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+.input-row input,.input-row select { background:#0d1b2a; border:1px solid #444; color:#fff; padding:10px 14px; border-radius:8px; font-size:14px; }
+.input-row input:focus { border-color:#a335ee; outline:none; }
+.input-row input[type=text] { flex:1; min-width:200px; }
+.input-row select { color:#ffd700; cursor:pointer; }
+.help-text { color:#666; font-size:12px; margin-top:6px; }
+.items-list { margin-top:16px; }
+.item-pending { background:#16213e; border-radius:8px; padding:10px 14px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; border-left:3px solid #a335ee; }
+
+/* Results styles */
+.result-card { background:#1a1a2e; border:1px solid #a335ee; border-radius:10px; padding:16px; margin-bottom:16px; }
+.result-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.result-item-name { color:#a335ee; font-size:18px; font-weight:bold; }
+.result-diff { color:#ffd700; font-size:14px; margin-left:8px; }
+.result-ilvl { color:#88f; font-size:14px; }
+.result-meta { display:flex; gap:16px; margin-bottom:14px; font-size:13px; color:#aaa; flex-wrap:wrap; }
+.candidate-row { background:#16213e; border-radius:8px; padding:10px 14px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; }
+.candidate-left { display:flex; align-items:center; gap:10px; }
+.candidate-right { display:flex; align-items:center; gap:16px; font-size:13px; }
+.score-badge { background:#a335ee; color:#fff; border-radius:6px; padding:4px 10px; font-weight:bold; min-width:40px; text-align:center; }
+.section-label { font-size:13px; color:#ffd700; margin-bottom:8px; font-weight:bold; }
+
+/* BiS Tab 4 Styles */
+#bisTab { display:flex; flex-direction:column; gap:16px; }
+#classGrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(80px,1fr)); gap:16px; margin-bottom:20px; justify-items:center; }
+.class-icon { display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer; transition:all 0.2s; }
+.class-icon img { width:64px; height:64px; border-radius:8px; border:2px solid #444; transition:all 0.2s; }
+.class-icon img:hover { border-color:#a335ee; transform:scale(1.05); }
+.class-icon.selected img { border-color:#a335ee; box-shadow:0 0 12px rgba(163,53,238,0.6); }
+.class-name { font-size:12px; font-weight:bold; text-align:center; color:#888; max-width:64px; }
+.class-icon.selected .class-name { font-weight:bold; }
+
+#specGrid { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; min-height:40px; }
+.spec-btn { padding:8px 16px; border:none; border-radius:6px; background:#16213e; color:#e0e0e0; cursor:pointer; font-weight:bold; font-size:13px; transition:all 0.2s; }
+.spec-btn:hover { transform:scale(1.05); }
+.spec-btn.active { background:#a335ee; color:#fff; }
+.spec-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+#bisContent { background:#1a1a2e; border-radius:8px; padding:16px; min-height:200px; }
+.bis-title { font-size:16px; font-weight:bold; color:#ffd700; margin-bottom:12px; }
+.bis-table { width:100%; border-collapse:collapse; }
+.bis-table th { padding:10px; text-align:left; font-weight:bold; color:#fff; font-size:13px; }
+.bis-table td { padding:10px; border-bottom:1px solid #333; font-size:13px; }
+.bis-table tr:nth-child(odd) { background:#16213e; }
+.bis-table tr:nth-child(even) { background:#1a1a2e; }
+.bis-table tr:first-child { background-repeat:repeat-x; }
+.no-data { color:#888; text-align:center; padding:40px 20px; }
+
+/* Trinket Tier List */
+.trinket-tiers { display:flex; flex-direction:column; gap:4px; }
+.tier-row { display:flex; min-height:56px; }
+.tier-label { width:44px; min-width:44px; display:flex; align-items:center; justify-content:center; border-radius:6px 0 0 6px; }
+.tier-items { flex:1; display:flex; flex-wrap:wrap; gap:8px; padding:8px 12px; background:#16213e; border-radius:0 6px 6px 0; align-items:center; }
+.tier-trinket { display:flex; align-items:center; gap:6px; padding:4px 8px; border-radius:6px; background:#1a1a2e; cursor:default; transition:all 0.2s; max-width:220px; }
+.tier-trinket:hover { transform:scale(1.03); }
+
+/* BiS Hover Tooltip on candidate rows */
+.candidate-row { position:relative; }
+.candidate-row .bis-tooltip { display:none; position:absolute; bottom:100%; right:0; background:#1a1a2e; border:1px solid #a335ee; border-radius:8px; padding:10px 14px; z-index:100; font-size:12px; box-shadow:0 4px 16px rgba(0,0,0,0.6); pointer-events:none; max-width:420px; }
+.candidate-row .bis-tooltip.trinket-tip { white-space:normal; min-width:320px; }
+.candidate-row .bis-tooltip:not(.trinket-tip) { white-space:nowrap; }
+.candidate-row:hover .bis-tooltip { display:block; }
+.bis-tooltip .tip-title { color:#ffd700; font-weight:bold; margin-bottom:6px; font-size:13px; }
+.bis-tooltip .tip-item { color:#a335ee; font-weight:bold; }
+.bis-tooltip .tip-source { color:#888; font-size:11px; }
+.bis-tooltip .mini-tier-row { display:flex; align-items:center; gap:6px; margin:3px 0; }
+.bis-tooltip .mini-tier-label { width:20px; font-weight:bold; font-size:11px; text-align:center; border-radius:3px; padding:1px 4px; }
+.bis-tooltip .mini-tier-items { color:#ccc; font-size:11px; flex:1; }
+.bis-tooltip .mini-tier-items .bis-match { color:#00ff88; font-weight:bold; }
+
+/* Assign button */
+.btn-assign { background:none; border:1px solid #555; color:#aaa; font-size:11px; padding:2px 8px; border-radius:4px; cursor:pointer; transition:all 0.2s; }
+.btn-assign:hover { border-color:#2ecc40; color:#2ecc40; }
+.assigned-badge { background:#2ecc40; color:#000; font-size:10px; font-weight:bold; padding:1px 6px; border-radius:4px; margin-left:4px; }
+
+/* Loot History */
+.loot-summary-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:8px; margin-bottom:16px; }
+.loot-summary-card { background:#16213e; border-radius:8px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; }
+.loot-summary-card .loot-count { font-size:22px; font-weight:bold; color:#ffd700; }
+.loot-table { width:100%; border-collapse:collapse; font-size:13px; }
+.loot-table th { text-align:left; padding:8px 10px; background:#1a1a3e; color:#ffd700; border-bottom:2px solid #a335ee; }
+.loot-table td { padding:6px 10px; border-bottom:1px solid #222; }
+.loot-table tr:hover { background:#16213e; }
+.loot-delete { cursor:pointer; color:#666; font-size:14px; }
+.loot-delete:hover { color:#e74c3c; }
+
+/* Weight Sliders */
+.weights-panel { background:#16213e; border:1px solid #333; border-radius:10px; padding:16px; margin-bottom:12px; }
+.weights-title { color:#ffd700; font-size:14px; font-weight:bold; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; }
+.weights-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px 20px; }
+.weight-item { display:flex; flex-direction:column; gap:4px; }
+.weight-item label { font-size:12px; color:#aaa; display:flex; justify-content:space-between; }
+.weight-item label .w-val { color:#ffd700; font-weight:bold; }
+.weight-item input[type=range] { -webkit-appearance:none; width:100%; height:6px; background:#0d1b2a; border-radius:3px; outline:none; }
+.weight-item input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:#a335ee; cursor:pointer; }
+.weight-item input[type=range]::-moz-range-thumb { width:16px; height:16px; border-radius:50%; background:#a335ee; cursor:pointer; border:none; }
+.weights-total { font-size:12px; color:#888; margin-top:8px; text-align:right; }
+.weights-total .ok { color:#2ecc40; }
+.weights-total .warn { color:#e74c3c; }
+.weights-presets { display:flex; gap:6px; }
+.weights-presets button { background:#0d1b2a; border:1px solid #444; color:#aaa; font-size:11px; padding:3px 10px; border-radius:4px; cursor:pointer; transition:all 0.2s; }
+.weights-presets button:hover { border-color:#a335ee; color:#fff; }
+
+/* Droptimizer */
+.droptimizer-panel { background:#16213e; border:1px solid #333; border-radius:10px; padding:16px; margin-bottom:12px; }
+.droptimizer-title { color:#ff8844; font-size:14px; font-weight:bold; margin-bottom:8px; }
+.droptimizer-info { color:#888; font-size:12px; margin-bottom:10px; line-height:1.5; }
+.droptimizer-input { display:flex; gap:8px; margin-bottom:8px; }
+.droptimizer-input textarea { flex:1; background:#0d1b2a; border:1px solid #444; color:#fff; padding:10px; border-radius:8px; font-size:12px; font-family:monospace; resize:vertical; min-height:60px; }
+.droptimizer-input textarea:focus { border-color:#ff8844; outline:none; }
+.droptimizer-entries { max-height:200px; overflow-y:auto; }
+.droptimizer-entry { background:#1a1a2e; border-radius:6px; padding:8px 12px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; font-size:12px; }
+.droptimizer-entry .dp-name { font-weight:bold; }
+.droptimizer-entry .dp-gain { color:#2ecc40; font-weight:bold; }
+.droptimizer-entry .dp-remove { cursor:pointer; color:#666; }
+.droptimizer-entry .dp-remove:hover { color:#e74c3c; }
+
+/* Tier Tracking */
+.tier-badge { display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:bold; padding:1px 6px; border-radius:4px; margin-left:4px; }
+.tier-0 { background:#333; color:#666; }
+.tier-1 { background:#444; color:#aaa; }
+.tier-2 { background:#2d4a1e; color:#2ecc40; }
+.tier-3 { background:#4a3a1e; color:#ffd700; }
+.tier-4 { background:#4a1e3a; color:#ff44ff; }
+.tier-5 { background:#ff8844; color:#000; }
+.tier-complete { animation:tierPulse 1s ease-in-out infinite; }
+@keyframes tierPulse { 0%,100%{opacity:1;} 50%{opacity:0.7;} }
+.tier-manager { background:#16213e; border:1px solid #333; border-radius:10px; padding:16px; margin-bottom:12px; }
+.tier-manager-title { color:#ff44ff; font-size:14px; font-weight:bold; margin-bottom:10px; }
+.tier-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:8px; max-height:300px; overflow-y:auto; }
+.tier-player-row { background:#1a1a2e; border-radius:6px; padding:8px 10px; display:flex; align-items:center; gap:8px; font-size:12px; }
+.tier-player-name { font-weight:bold; min-width:90px; }
+.tier-slots { display:flex; gap:4px; }
+.tier-slot { width:28px; height:28px; border-radius:4px; border:1px solid #444; display:flex; align-items:center; justify-content:center; font-size:10px; cursor:pointer; transition:all 0.15s; color:#666; }
+.tier-slot:hover { border-color:#ff44ff; }
+.tier-slot.has { background:#4a1e3a; border-color:#ff44ff; color:#ff44ff; }
+.tier-slot-label { font-size:9px; color:#666; text-align:center; }
+.tier-count { font-weight:bold; margin-left:auto; padding:2px 8px; border-radius:4px; font-size:12px; }
+
+/* Toast */
+.toast { position:fixed; top:20px; right:20px; padding:12px 20px; border-radius:8px; color:#fff; font-size:14px; z-index:9999; transition:opacity 0.6s; }
+.toast-ok { background:#2ecc40; }
+.toast-err { background:#e74c3c; }
+.toast-info { background:#3498db; }
+
+@media (max-width:768px) {
+  .tabs button { padding:10px; font-size:12px; }
+  .player-grid { grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); }
+  #classGrid { grid-template-columns:repeat(auto-fit,minmax(70px,1fr)); gap:12px; }
+  .spec-btn { padding:6px 12px; font-size:12px; }
+}
+</style>
+</head>
+<body>
+<div id="toastBox"></div>
+
+<div class="top-bar">
+  <div class="logo">EK</div>
+  <div>
+    <h1>Eternal Karma — Loot Advisor</h1>
+    <div class="sub">Herramienta de loot para cada boss de raid</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button id="n1" class="on" onclick="showStep(1)">1. Roster</button>
+  <button id="n2" onclick="showStep(2)">2. Boss & Loot</button>
+  <button id="n3" onclick="showStep(3)">3. Resultados</button>
+  <button id="n4" onclick="showStep(4)">4. BiS por Clase</button>
+  <button id="n5" onclick="showStep(5)">5. Loot History</button>
+</div>
+
+<!-- ========== STEP 1: ROSTER ========== -->
+<div id="s1" class="step active">
+  <div class="roster-controls">
+    <button class="btn btn-primary" id="btnLoadRoster">📥 Cargar desde RaidForge</button>
+    <button class="btn btn-sm" id="btnImportJSON" style="background:#3498db;color:#fff;">📂 Importar JSON</button>
+    <button class="btn btn-sm" id="btnExportJSON" style="background:#555;color:#fff;" title="Exportar roster actual">💾 Exportar</button>
+    <input type="file" id="jsonFileInput" accept=".json" style="display:none">
+    <button class="btn btn-sm btn-purple" id="btnSelectAll">Todos</button>
+    <button class="btn btn-sm" id="btnSelectMains" style="background:#b8860b;color:#fff;">Solo Mains</button>
+    <button class="btn btn-sm btn-orange" id="btnDeselectAll">Ninguno</button>
+  </div>
+  <div class="stats-bar">
+    <span><span class="lbl">Total:</span> <span class="val" id="statTotal">0</span></span>
+    <span><span class="lbl">En Raid:</span> <span class="val" id="statPresent">0</span></span>
+    <span><span class="lbl">Tanks:</span> <span class="val" id="statTanks">0</span></span>
+    <span><span class="lbl">Healers:</span> <span class="val" id="statHealers">0</span></span>
+    <span><span class="lbl">DPS:</span> <span class="val" id="statDPS">0</span></span>
+    <span><span class="lbl">Avg ilvl:</span> <span class="val" id="statIlvl">0</span></span>
+    <span><span class="lbl">Gear Data:</span> <span class="val" id="statGear">0</span></span>
+  </div>
+  <!-- Weight Sliders Panel (3 factors only) -->
+  <div class="weights-panel" id="weightsPanel">
+    <div class="weights-title">
+      <span>⚖️ Pesos del Algoritmo</span>
+      <div class="weights-presets">
+        <button onclick="applyPreset('balanced')">Balanceado</button>
+        <button onclick="applyPreset('simfirst')">Sim First</button>
+        <button onclick="applyPreset('performance')">Performance</button>
+      </div>
+    </div>
+    <div class="weights-grid">
+      <div class="weight-item">
+        <label>📈 Droptimizer (DPS Gain) <span class="w-val" id="wv_drop">50%</span></label>
+        <input type="range" id="ws_drop" min="0" max="100" value="50" oninput="updateWeights()">
+      </div>
+      <div class="weight-item">
+        <label>📊 WCL Performance <span class="w-val" id="wv_wcl">30%</span></label>
+        <input type="range" id="ws_wcl" min="0" max="100" value="30" oninput="updateWeights()">
+      </div>
+      <div class="weight-item">
+        <label>📅 Attendance <span class="w-val" id="wv_att">20%</span></label>
+        <input type="range" id="ws_att" min="0" max="100" value="20" oninput="updateWeights()">
+      </div>
+    </div>
+    <div class="weights-total" id="weightsTotal">Total: <span class="ok">100%</span></div>
+  </div>
+
+  <!-- Droptimizer Session Tracker -->
+  <div class="droptimizer-panel" id="droptimizerPanel">
+    <div class="droptimizer-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>📊 Droptimizer — Sesion de Raid</span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-sm" style="background:#3498db;color:#fff;" onclick="syncFromBackend()" id="syncBtn">☁️ Sync Server</button>
+        <button class="btn btn-sm" style="background:#ff8844;color:#fff;" onclick="refreshDroptimizerSession()">🔄 Refresh</button>
+        <button class="btn btn-sm" style="background:#333;color:#888;" onclick="clearDroptimizerData()">🗑️ Clear</button>
+      </div>
+    </div>
+    <div style="font-size:13px;color:#888;margin-bottom:10px;">
+      Cada raider sube su Droptimizer antes de raid desde su link personal.
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;" id="sessionStats">
+      <span><span class="lbl">Subieron:</span> <span class="val" id="sessionSubmitted" style="color:#2ecc40;">0</span></span>
+      <span><span class="lbl">Faltan:</span> <span class="val" id="sessionMissing" style="color:#e74c3c;">0</span></span>
+      <span><span class="lbl">Ultima actualizacion:</span> <span class="val" id="sessionLastUpdate" style="color:#888;">—</span></span>
+    </div>
+    <!-- Import EK-DROP codes (from Discord or manual) -->
+    <details style="margin-bottom:8px;" open>
+      <summary style="cursor:pointer;font-size:12px;color:#ff8844;font-weight:bold;">📦 Importar Datos (Codigos EK-DROP o URLs)</summary>
+      <div style="margin-top:8px;">
+        <textarea id="ekDropCodes" style="width:100%;background:#0d1b2a;border:1px solid #444;color:#fff;padding:10px;border-radius:8px;font-size:12px;font-family:monospace;resize:vertical;min-height:60px;" placeholder="Pega codigos EK-DROP o URLs de Raidbots (uno por linea)&#10;EK-DROP|Garompinax|39746|Gaze of the Alnseer:2473,...&#10;https://www.raidbots.com/simbot/report/XXXXX"></textarea>
+        <button class="btn btn-sm" style="background:#2ecc40;color:#fff;margin-top:6px;" onclick="importMixedDroptimizer()">📥 Importar</button>
+      </div>
+    </details>
+    <!-- Session Grid: who submitted, who missing -->
+    <div id="sessionGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;max-height:300px;overflow-y:auto;"></div>
+  </div>
+
+  <!-- Tier Set Tracker -->
+  <div class="tier-manager" id="tierPanel">
+    <div class="tier-manager-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>🛡️ Tier Set Tracker</span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-sm" style="background:#ff44ff;color:#000;" onclick="autoDetectTierFromLoot()">🔄 Auto-detectar desde Loot</button>
+        <button class="btn btn-sm" style="background:#555;color:#fff;" onclick="exportTierData()">💾 Export</button>
+        <button class="btn btn-sm" style="background:#333;color:#888;" onclick="clearTierData()">🗑️</button>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#888;margin-bottom:8px;">Click en cada slot para marcar si el jugador tiene esa pieza de tier. Los slots son: Head, Shoulders, Chest, Hands, Legs.</div>
+    <div class="tier-grid" id="tierGrid">
+      <div style="color:#666;text-align:center;padding:12px;">Importa el roster primero</div>
+    </div>
+  </div>
+
+  <div class="player-grid" id="playerGrid"></div>
+  <div style="margin-top:12px;text-align:right;">
+    <button class="btn btn-purple" onclick="showStep(2)">Siguiente: Boss & Loot ➡️</button>
+  </div>
+</div>
+
+<!-- ========== STEP 2: BOSS & LOOT ========== -->
+<div id="s2" class="step">
+  <div class="stats-bar" style="margin-bottom:16px;">
+    <span><span class="lbl">En Raid:</span> <span class="val" id="s2Present">0</span></span>
+    <span><span class="lbl">Avg ilvl:</span> <span class="val" id="s2Ilvl">0</span></span>
+    <span><span class="lbl">Boss #:</span> <span class="val" id="s2BossNum">1</span></span>
+  </div>
+
+  <div class="boss-section">
+    <div class="boss-title">🎯 Agregar Item</div>
+    <div class="input-row">
+      <input type="text" id="itemNameInput" placeholder="Nombre del item o URL de Wowhead" />
+      <select id="diffSelect">
+        <option value="Normal">Normal</option>
+        <option value="Heroic" selected>Heroic</option>
+        <option value="Mythic">Mythic</option>
+      </select>
+      <input type="number" id="ilvlOverride" placeholder="ilvl (opc)" style="max-width:100px;" />
+      <button class="btn btn-purple" id="btnAnalyze">🔍 Analizar</button>
+    </div>
+    <div class="help-text">
+      Pega el nombre del item, una URL de Wowhead, o un item ID. La app detecta slot, armadura y stats automáticamente.
+      Si el nombre no se reconoce, pega la URL de Wowhead del item (ej: https://www.wowhead.com/item=232850).
+    </div>
+  </div>
+
+  <div class="items-list" id="itemsList">
+    <div style="color:#666;text-align:center;padding:20px;">Los items analizados aparecerán aquí</div>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-top:12px;">
+    <button class="btn btn-orange" id="btnNewBoss">➕ Nuevo Boss</button>
+    <button class="btn btn-purple" onclick="showStep(3)" style="margin-left:auto;">Ver Resultados ➡️</button>
+  </div>
+</div>
+
+<!-- ========== STEP 3: RESULTADOS ========== -->
+<div id="s3" class="step">
+  <div class="stats-bar" style="margin-bottom:16px;">
+    <span><span class="lbl">Items Analizados:</span> <span class="val" id="s3ItemCount">0</span></span>
+    <span><span class="lbl">Boss #:</span> <span class="val" id="s3BossNum">1</span></span>
+  </div>
+  <div id="resultsPanel">
+    <div style="color:#666;text-align:center;padding:40px;">Analiza items en la pestaña "Boss & Loot" para ver resultados aquí</div>
+  </div>
+</div>
+
+<!-- ========== STEP 4: BiS POR CLASE ========== -->
+<div id="s4" class="step">
+  <div id="bisTab">
+    <div>
+      <div style="color:#ffd700; font-size:14px; margin-bottom:12px; font-weight:bold;">Selecciona tu clase:</div>
+      <div id="classGrid" style="id:cG;"></div>
+    </div>
+    <div>
+      <div style="color:#ffd700; font-size:14px; margin-bottom:8px; font-weight:bold;">Especialización:</div>
+      <div id="specGrid" style="id:spG;"></div>
+    </div>
+    <div id="bisContent" style="id:bisC;">
+      <div class="no-data">Selecciona una clase y especialización para ver el BiS</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== STEP 5: LOOT HISTORY ========== -->
+<div id="s5" class="step">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div style="color:#ffd700;font-size:16px;font-weight:bold;">📜 Loot History</div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-sm" style="background:#ff8844;color:#fff;" onclick="document.getElementById('rcLootFileInput').click()">📋 Importar RCLootCouncil</button>
+      <input type="file" id="rcLootFileInput" accept=".csv,.txt" style="display:none" onchange="importRCLootCSV(event)">
+      <button class="btn btn-sm" id="btnExportLoot" style="background:#555;color:#fff;">💾 Exportar</button>
+      <button class="btn btn-sm" id="btnImportLoot" style="background:#3498db;color:#fff;">📂 Importar JSON</button>
+      <input type="file" id="lootFileInput" accept=".json" style="display:none">
+      <button class="btn btn-sm" id="btnClearLoot" style="background:#c0392b;color:#fff;">🗑️ Limpiar</button>
+    </div>
+  </div>
+  <div id="lootSummary" style="margin-bottom:16px;"></div>
+  <div id="lootTable"></div>
+</div>
+
+<script>
+// ===== SPEC DATA =====
+window.SD = {
+  'Death Knight': {specs:['Blood','Frost','Unholy'], color:'#C41E3A'},
+  'Demon Hunter': {specs:['Havoc','Vengeance'], color:'#A330C9'},
+  'Druid': {specs:['Balance','Feral','Guardian','Restoration'], color:'#FF7C0A'},
+  'Evoker': {specs:['Augmentation','Devastation','Preservation'], color:'#33937F'},
+  'Hunter': {specs:['Beast Mastery','Marksmanship','Survival'], color:'#AAD372'},
+  'Mage': {specs:['Arcane','Fire','Frost'], color:'#3FC7EB'},
+  'Monk': {specs:['Brewmaster','Mistweaver','Windwalker'], color:'#00FF98'},
+  'Paladin': {specs:['Holy','Protection','Retribution'], color:'#F48CBA'},
+  'Priest': {specs:['Discipline','Holy','Shadow'], color:'#FFFFFF'},
+  'Rogue': {specs:['Assassination','Outlaw','Subtlety'], color:'#FFF468'},
+  'Shaman': {specs:['Elemental','Enhancement','Restoration'], color:'#0070DD'},
+  'Warlock': {specs:['Affliction','Demonology','Destruction'], color:'#8788EE'},
+  'Warrior': {specs:['Arms','Fury','Protection'], color:'#C69B6D'}
+};
+
+// ===== BiS CACHE - PARSED FROM bis-data.txt =====
+window.bisCache = {};
+
+// BiS Data: 39 lines parsed
+const bisRawData = [
+  "Death Knight_Blood:::Weapon|Garfrost's Two-Ton Hammer|Pit of Saron;;Head|Relentless Rider's Crown|Tier Set;;Neck|Eternal Voidsong Chain|Crown of the Cosmos;;Shoulders|Relentless Rider's Dreadthorns|Tier Set;;Cloak|Defiant Defender's Drape|Magister's Terrace;;Chest|Relentless Rider's Cuirass|Tier Set;;Wrist|Spellbreaker's Bracers|Crafting;;Gloves|Voidclaw Gauntlets|Seat of the Triumvirate;;Belt|Bent Gold Belt|Pit of Saron;;Legs|Relentless Rider's Legguards|Tier Set;;Boots|Greaves of the Unformed|Chimaerus;;Ring|Eye of Midnight|Midnight Falls;;Ring|Loa Worshiper's Band|Crafting;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Light Company Guidon|Imperator Averzian",
+  "Death Knight_Frost:::Weapon|Bellamy's Final Judgement|Lightblinded Vanguard;;Weapon|Blade of the Final Twilight|Fallen-King Salhadaar;;Head|Relentless Rider's Crown|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Shoulderplates of Frozen Blood|Pit of Saron;;Cloak|Adherent's Silken Shroud|Crafting;;Chest|Relentless Rider's Cuirass|Tier Set;;Wrist|Spellbreaker's Bracers|Crafting;;Gloves|Relentless Rider's Bonegrasps|Tier Set;;Belt|Hate-Tied Waistchain|Crown of the Cosmos;;Legs|Relentless Rider's Legguards|Tier Set;;Boots|Greaves of the Unformed|Chimaerus;;Ring|Platinum Star Band|Algeth'ar Academy;;Ring|Sin'dorei Band of Hope|Belo'ren;;Trinket|Light Company Guidon|Imperator Averzian;;Trinket|Gaze of the Alnseer|Chimaerus",
+  "Death Knight_Unholy:::Weapon|Bellamy's Final Judgement|Lightblinded Vanguard;;Head|Relentless Rider's Crown|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Shoulderplates of Frozen Blood|Pit of Saron;;Cloak|Adherent's Silken Shroud|Crafting;;Chest|Relentless Rider's Cuirass|Tier Set;;Wrist|Spellbreaker's Bracers|Crafting;;Gloves|Relentless Rider's Bonegrasps|Tier Set;;Belt|Relentless Rider's Chain|Catalyst;;Legs|Relentless Rider's Legguards|Tier Set;;Boots|Greaves of the Unformed|Chimaerus;;Ring|Platinum Star Band|Algeth'ar Academy;;Ring|Sin'dorei Band of Hope|Belo'ren;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Light Company Guidon|Imperator Averzian",
+  "Demon Hunter_Havoc:::Weapon|Lightless Lament|Midnight Falls;;Off Hand|Emblazoned Sunglaive|Vaelgor & Ezzorak;;Head|Spellsnap Shadowmask|Magister's Terrace;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Devouring Reaver's Exhaustplates|Tier Set;;Cloak|Adherent's Silken Shroud|Crafting;;Chest|Devouring Reaver's Engine|Tier Set;;Wrist|Silvermoon Agent's Deflectors|Crafting;;Gloves|Devouring Reaver's Essence Grips|Tier Set;;Belt|Snapvine Cinch|Windrunner Spire;;Legs|Devouring Reaver's Pistons|Tier Set;;Boots|Boots of Burning Focus|Skyreach;;Ring|Sin'dorei Band of Hope|Belo'ren;;Ring|Platinum Star Band|Algeth'ar Academy;;Trinket|Algeth'ar Puzzle Box|Algeth'ar Academy;;Trinket|Umbral Plume|Belo'ren",
+  "Demon Hunter_Vengeance:::Weapon|Lightless Lament|Midnight Falls;;Off Hand|Tormentor's Bladed Fists|Fallen-King Salhadaar;;Head|Devouring Reaver's Intake|Tier Set;;Neck|Necklace of the Twisting Void|Seat of the Triumvirate;;Shoulders|Devouring Reaver's Exhaustplates|Tier Set;;Cloak|Adherent's Silken Shroud|Crafting;;Chest|Vest of the Void's Embrace|Seat of the Triumvirate;;Wrist|Chewed Leather Wristguards|Pit of Saron;;Gloves|Devouring Reaver's Essence Grips|Tier Set;;Belt|Flayer's Black Belt|Pit of Saron;;Legs|Devouring Reaver's Pistons|Tier Set;;Boots|Eclipse Espadrilles|Nexus Point Xenas;;Ring|Omission of Light|Nexus Point Xenas;;Ring|Eye of Midnight|Midnight Falls;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Light Company Guidon|Imperator Averzian",
+  "Druid_Balance:::Weapon|Belo'melorn, the Shattered Talon|Belo'ren;;Off Hand|Aln'hara Lantern|Crafting;;Head|Branches of the Luminous Bloom|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Seedpods of the Luminous Bloom|Tier Set;;Cloak|Draconic Nullcape|Vaelgor & Ezzorak;;Chest|Trunk of the Luminous Bloom|Tier Set;;Wrist|Silvermoon Agent's Deflectors|Crafting;;Gloves|Gloves of Viscous Goo|Magister's Terrace;;Belt|Snapvine Cinch|Windrunner Spire;;Legs|Phloemwraps of the Luminous Bloom|Tier Set;;Boots|Canopy Walker's Footwraps|Crown of the Cosmos;;Ring|Platinum Star Band|Algeth'ar Academy;;Ring|Occlusion of Void|Nexus-Point Xenas;;Trinket|Vaelgor's Final Stare|Vaelgor & Ezzorak;;Trinket|Locus-Walker's Ribbon|Crown of the Cosmos",
+  "Druid_Feral:::Weapon|Inescapable Reach|Vorasius;;Head|Branches of the Luminous Bloom|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Seedpods of the Luminous Bloom|Tier Set;;Cloak|Draconic Nullcape|Vaelgor & Ezzorak;;Chest|Trunk of the Luminous Bloom|Tier Set;;Wrist|Silvermoon Agent's Deflectors|Crafting;;Gloves|Silvermoon Agent's Handwraps|Crafting;;Belt|Snapvine Cinch|Windrunner Spire;;Legs|Phloemwraps of the Luminous Bloom|Tier Set;;Boots|Canopy Walker's Footwraps|Crown of the Cosmos;;Ring|Eye of Midnight|Midnight Falls;;Ring|Bifurcation Band|Magister's Terrace;;Trinket|Algeth'ar Puzzle Box|Algeth'ar Academy;;Trinket|Radiant Plume|Belo'ren",
+  "Druid_Guardian:::Weapon|Alnscorned Spire|Chimaerus;;Head|Mask of Darkest Intent|Seat of the Triumvirate;;Neck|Eternal Voidsong Chain|Crown of the Cosmos;;Shoulders|Seedpods of the Luminous Bloom|Tier Set;;Cloak|Draconic Nullcape|Vaelgor & Ezzorak;;Chest|Trunk of the Luminous Bloom|Tier Set;;Wrist|Void-Skinned Bracers|Vorasius;;Gloves|Arbortenders of the Luminous Bloom|Tier Set;;Belt|Scorn-Scarred Shul'ka's Belt|Chimaerus;;Legs|Phloemwraps of the Luminous Bloom|Tier Set;;Boots|Void-Claimed Shinkickers|Imperator Averzian;;Ring|Omission of Light|Nexus Point Xenas;;Ring|Eye of Midnight|Midnight Falls;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Algeth'ar Puzzle Box|Algeth'ar Academy",
+  "Druid_Restoration:::Head|Branches of the Luminous Bloom|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Seedpods of the Luminous Bloom|Tier Set;;Cloak|Draconic Nullcape|Vaelgor & Ezzorak;;Chest|Maledict Vest|Nexus Point Xenas;;Wrist|Frenzyroot Cuffs|Algeth'ar Academy;;Gloves|Arbortenders of the Luminous Bloom|Tier Set;;Belt|Twisted Twilight Sash|Fallen-King Salhadaar;;Legs|Phloemwraps of the Luminous Bloom|Tier Set;;Boots|Eclipse Espadrilles|Nexus Point Xenas;;Ring|Eye of Midnight|Midnight Falls;;Ring|Bifurcation Band|Magister's Terrace;;Trinket|Locus-Walker's Ribbon|Crown of the Cosmos;;Trinket|Vaelgor's Final Stare|Vaelgor & Ezzorak;;Weapon|Belo'melorn, the Shattered Talon|Belo'ren;;Off Hand|Tome of Alnscorned Regret|Chimaerus",
+  "Evoker_Augmentation:::Weapon|Ceremonial Hexblade|Maisara Caverns;;Off Hand|Grimoire of the Eternal Light|Vorasius;;Head|Horns of the Spurned Val'kyr|Pit of Saron;;Neck|Ribbon of Coiled Malice|Fallen-King Salhadaar;;Shoulders|Beacons of the Black Talon|Tier Set;;Cloak|Adherent's Silken Shroud|Crafting;;Chest|Frenzyward of the Black Talon|Tier Set;;Wrist|Farstrider's Plated Bracers|Crafting;;Gloves|Enforcer's Grips of the Black Talon|Tier Set;;Belt|Scabrous Zombie Leather Belt|Pit of Saron;;Legs|Greaves of the Black Talon|Tier Set;;Boots|Spelltreads of the Black Talon|Catalyst;;Ring|Eye of Midnight|Midnight Falls;;Ring|Purloined Wedding Ring|Pit of Saron;;Trinket|Shadow of the Empyrean Requiem|Midnight Falls;;Trinket|Heart of Wind|Windrunner Spire",
+  "Evoker_Devastation:::Weapon|Belo'melorn, the Shattered Talon|Belo'ren;;Off Hand|Grimoire of the Eternal Light|Vorasius;;Head|Hornhelm of the Black Talon|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Beacons of the Black Talon|Tier Set;;Cloak|Adherent's Silken Shroud|Crafting;;Chest|Frenzyward of the Black Talon|Tier Set;;Wrist|Farstrider's Plated Bracers|Crafting;;Gloves|Untethered Berserker's Grips|Crown of the Cosmos;;Belt|Scabrous Zombie Leather Belt|Pit of Saron;;Legs|Greaves of the Black Talon|Tier Set;;Boots|Darkstrider Treads|Belo'ren;;Ring|Sin'dorei Band of Hope|Belo'ren;;Ring|Eye of Midnight|Midnight Falls;;Trinket|Vaelgor's Final Stare|Vaelgor & Ezzorak;;Trinket|Locus-Walker's Ribbon|Crown of the Cosmos",
+  "Evoker_Preservation:::Head|Oblivion Guise|Midnight Falls;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Beacons of the Black Talon|Tier Set;;Cloak|Fluxweave Cloak|Nexus Point Xenas;;Chest|Frenzyward of the Black Talon|Tier Set;;Wrist|Amberfrond Bracers|Windrunner Spire;;Gloves|Enforcer's Grips of the Black Talon|Tier Set;;Belt|Azure Belt of Competition|Algeth'ar Academy;;Legs|Greaves of the Black Talon|Tier Set;;Boots|Whipcoil Sabatons|Windrunner Spire;;Ring|Bond of Light|Lightblinded Vanguard;;Ring|Eye of Midnight|Midnight Falls;;Trinket|Vaelgor's Final Stare|Vaelgor & Ezzorak;;Trinket|Locus-Walker's Ribbon|Crown of the Cosmos;;Weapon|Umbral Spire of Zuraal|Seat of the Triumvirate",
+  "Hunter_Beast Mastery:::Weapon|Deceiver's Rotbow|Maisara Caverns;;Head|Primal Sentry's Maw|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Pauldrons of the Void Hunter|Seat of the Triumvirate;;Cloak|Rigid Scale Greatcloak|Skyreach;;Chest|Primal Sentry's Scaleplate|Tier Set;;Wrist|Corewarden Cuffs|Nexus Point Xenas;;Gloves|Primal Sentry's Talonguards|Tier Set;;Belt|World Tender's Barkclasp|Crafting;;Legs|Primal Sentry's Legguards|Tier Set;;Boots|World Tender's Rootslippers|Crafting;;Ring|Eye of Midnight|Midnight Falls;;Ring|Bond of Light|Lightblinded Vanguard;;Trinket|Radiant Plume|Belo'ren;;Trinket|Algeth'ar Puzzle Box|Algeth'ar Academy",
+  "Hunter_Marksmanship:::Weapon|Ranger-Captain's Lethal Recurve|Crown of the Cosmos;;Head|Primal Sentry's Maw|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Pauldrons of the Void Hunter|Seat of the Triumvirate;;Cloak|Imperator's Banner|Imperator Averzian;;Chest|Primal Sentry's Scaleplate|Tier Set;;Wrist|Fallen King's Cuffs|Fallen-King Salhadaar;;Gloves|Primal Sentry's Talonguards|Tier Set;;Belt|World Tender's Barkclasp|Crafting;;Legs|Primal Sentry's Legguards|Tier Set;;Boots|World Tender's Rootslippers|Crafting;;Ring|Sin'dorei Band of Hope|Belo'ren;;Ring|Signet of the Starved Beast|Vorasius;;Trinket|Algeth'ar Puzzle Box|Algeth'ar Academy;;Trinket|Umbral Plume|Belo'ren",
+  "Hunter_Survival:::Weapon|Roostwarden's Bough|Windrunner Spire;;Weapon|Belo'ren's Swift Talon|Belo'ren;;Off Hand|Farstrider's Mercy|Crafting;;Head|Primal Sentry's Maw|Tier Set;;Neck|Amulet of the Abyssal Hymn|L'ura;;Shoulders|Pauldrons of the Void Hunter|Seat of the Triumvirate;;Cloak|Draconic Nullcape|Vaelgor;;Chest|Primal Sentry's Scaleplate|Tier Set;;Wrist|Fallen King's Cuffs|Fallen-King Salhadaar;;Gloves|Primal Sentry's Talonguards|Tier Set;;Belt|Scornbane Waistguard|Chimaerus;;Legs|Primal Sentry's Legguards|Tier Set;;Boots|Farstrider's Razor Talons|Crafting;;Ring|Omission of Light|Nexus Point Xenas;;Ring|Occlusion of Void|Nexus Point Xenas;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Radiant Plume|Belo'ren",
+  "Mage_Arcane:::Weapon|Skybreaker's Blade|Skyreach;;Off Hand|Sigil of the Restless Heart|Windrunner Spire;;Head|Voidbreaker's Veil|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Voidbreaker's Leyline Nexi|Tier Set;;Cloak|Arcanoweave Cloak|Crafting;;Chest|Voidbreaker's Robe|Tier Set;;Wrist|Arcanoweave Bracers|Crafting;;Gloves|Voidbreaker's Gloves|Tier Set;;Belt|Whisper-Inscribed Sash|Belo'ren;;Legs|Commander's Faded Breeches|Windrunner Spire;;Boots|Dream-Scorched Striders|Chimaerus;;Ring|Sin'dorei Band of Hope|Belo'ren;;Ring|Eye of Midnight|Midnight Falls;;Trinket|Vaelgor's Final Stare|Vaelgor & Ezzorak;;Trinket|Gaze of the Alnseer|Chimaerus",
+  "Mage_Fire:::Weapon|Umbral Spire of Zuraal|Seat of the Triumvirate;;Head|Voidbreaker's Veil|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Mantle of Dark Devotion|Windrunner Spire;;Cloak|Rigid Scale Greatcloak|Skyreach;;Chest|Voidbreaker's Robe|Tier Set;;Wrist|Bracers of Blazing Light|Skyreach;;Gloves|Voidbreaker's Gloves|Tier Set;;Belt|Voidbreaker's Sage Cord|The Catalyst;;Legs|Voidbreaker's Britches|Tier Set;;Boots|Dream-Scorched Striders|Chimaerus;;Ring|Sin'dorei Band of Hope|Belo'ren;;Ring|Platinum Star Band|Algeth'ar Academy;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Emberwing Feather|Windrunner Spire",
+  "Mage_Frost:::Weapon|Umbral Spire of Zuraal|Seat of the Triumvirate;;Head|Voidbreaker's Veil|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Mantle of Dark Devotion|Windrunner Spire;;Cloak|Rigid Scale Greatcloak|Skyreach;;Chest|Voidbreaker's Robe|Tier Set;;Wrist|Bracers of Blazing Light|Skyreach;;Gloves|Voidbreaker's Gloves|Tier Set;;Belt|Voidbreaker's Sage Cord|The Catalyst;;Legs|Voidbreaker's Britches|Tier Set;;Boots|Dream-Scorched Striders|Chimaerus;;Ring|Sin'dorei Band of Hope|Belo'ren;;Ring|Platinum Star Band|Algeth'ar Academy;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Emberwing Feather|Windrunner Spire",
+  "Monk_Brewmaster:::Weapon|Inescapable Reach|Vorasius;;Head|Fearsome Visage of Ra-den's Chosen|Tier Set;;Neck|Masterwork Sin'dorei Amulet|Crafting;;Shoulders|Aurastones of Ra-den's Chosen|Tier Set;;Cloak|Imperator's Banner|Imperator Averzian;;Chest|Battle Garb of Ra-den's Chosen|Tier Set;;Wrist|Strikeguards of Ra-den's Chosen|Catalyst;;Gloves|Thunderfists of Ra-den's Chosen|Tier Set;;Belt|Snapvine Cinch|Windrunner Spire;;Legs|Shifting Stalker Hide Pants|Seat of the Triumvirate;;Boots|Footpads of Seeping Dread|Seat of the Triumvirate;;Ring|Signet of the Starved Beast|Vorasius;;Ring|Loa Worshiper's Band|Crafting;;Trinket|Radiant Plume|Belo'ren;;Trinket|Gaze of the Alnseer|Chimaerus",
+  "Monk_Mistweaver:::Weapon|Arcanic of the High Sage|Skyreach;;Off Hand|Grimoire of the Eternal Light|Vorasius;;Head|Mask of Darkest Intent|Midnight Falls;;Neck|Ribbon of Coiled Malice|Fallen-King Salhadaar;;Shoulders|Aurastones of Ra-den's Chosen|Tier Set;;Cloak|Defiant Defender's Drape|Magister's Terrace;;Chest|Battle Garb of Ra-den's Chosen|Tier Set;;Wrist|Chewed Leather Wristguards|Pit of Saron;;Gloves|Thunderfists of Ra-den's Chosen|Tier Set;;Belt|Flayer's Black Belt|Pit of Saron;;Legs|Swiftsweepers of Ra-den's Chosen|Tier Set;;Boots|Eclipse Espadrilles|Nexus-Point Xenas;;Ring|Eye of Midnight|Midnight Falls;;Ring|Band of the Triumvirate|Seat of the Triumvirate;;Trinket|Heart of Wind|Windrunner Spire;;Trinket|Litany of Lightblind Wrath|Lightblinded Vanguard",
+  "Monk_Windwalker:::Head|Fearsome Visage of Ra-den's Chosen|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Aurastones of Ra-den's Chosen|Tier Set;;Cloak|Windwrap of Ra-den's Chosen|Catalyst;;Chest|Battle Garb of Ra-den's Chosen|Tier Set;;Wrist|Void-Skinned Bracers|Vorasius;;Gloves|Vaelgor's Fearsome Grasp|Vaelgor & Ezzorak;;Belt|Snapvine Cinch|Windrunner Spire;;Legs|Swiftsweepers of Ra-den's Chosen|Tier Set;;Boots|Storm Crashers of Ra-den's Chosen|Catalyst;;Ring|Loa Worshiper's Band|Crafting;;Ring|Eye of Midnight|Midnight Falls;;Weapon|Traitor's Talon|Maisara Caverns;;Weapon|Arator's Swift Remembrance|Crown of the Cosmos;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Algeth'ar Puzzle Box|Algeth'ar Academy",
+  "Paladin_Holy:::Weapon|Spellboon Saber|Algeth'ar Academy;;Off Hand|Viryx's Indomitable Bulwark|Skyreach;;Head|Luminant Verdict's Unwavering Gaze|Lightblinded Vanguard;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Luminant Verdict's Providence Watch|Fallen-King Salhadaar;;Cloak|Rigid Scale Greatcloak|Skyreach;;Chest|Luminant Verdict's Divine Warplate|Chimaerus;;Wrist|Trollhunter's Bands|Maisara Caverns;;Gloves|Luminant Verdict's Gauntlets|Vorasius;;Belt|Ezzorak's Gloombind|Vaelgor & Ezzorak;;Legs|Extinction Guards|Midnight Falls;;Boots|Parasite Stompers|Vorasius;;Ring|Eye of Midnight|Midnight Falls;;Ring|Sin'dorei Band of Hope|Belo'ren;;Trinket|Vaelgor's Final Stare|Vaelgor & Ezzorak;;Trinket|Gaze of the Alnseer|Chimaerus",
+  "Paladin_Protection:::Weapon|Turalyon's False Echo|Crown of the Cosmos;;Off Hand|Thalassian Dawnguard|Belo'ren;;Head|Luminant Verdict's Unwavering Gaze|Tier Set;;Neck|Eternal Voidsong Chain|Crown of the Cosmos;;Shoulders|Luminant Verdict's Providence Watch|Tier Set;;Cloak|Draconic Nullcape|Vaelgor & Ezzorak;;Chest|Luminant Verdict's Divine Warplate|Tier Set;;Wrist|Light's March Bracers|Imperator Averzian;;Gloves|Voidclaw Gauntlets|Seat of the Triumvirate;;Belt|Ezzorak's Gloombind|Vaelgor & Ezzorak;;Legs|Luminant Verdict's Greaves|Tier Set;;Boots|Greaves of the Unformed|Chimaerus;;Ring|Eye of Midnight|Midnight Falls;;Ring|Band of the Triumvirate|Seat of the Triumvirate;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Heart of Ancient Hunger|Vorasius",
+  "Paladin_Retribution:::Weapon|Bellamy's Final Judgement|Lightblinded Vanguard;;Head|Luminant Verdict's Unwavering Gaze|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Luminant Verdict's Providence Watch|Tier Set;;Cloak|Adherent's Silken Shroud|Crafting;;Chest|Luminant Verdict's Divine Warplate|Tier Set;;Wrist|Spellbreaker's Bracers|Crafting;;Gloves|Voidclaw Gauntlets|Seat of the Triumvirate;;Belt|Hate-Tied Waistchain|Crown of the Cosmos;;Legs|Luminant Verdict's Greaves|Tier Set;;Boots|Greaves of the Unformed|Chimaerus;;Ring|Sin'dorei Band of Hope|Belo'ren;;Ring|Eye of Midnight|Midnight Falls;;Trinket|Umbral Plume|Belo'ren;;Trinket|Algeth'ar Puzzle Box|Algeth'ar Academy",
+  "Priest_Discipline:::Head|Blind Oath's Winged Crest|Raid ;;Neck|Eternal Voidsong Chain|Crown of the Cosmos (Raid);;Shoulders|Blind Oath's Seraphguards|Raid ;;Cloak|Draconic Nullcape|Vaelgor & Ezzorak (Raid);;Chest|Robes of Endless Oblivion|Midnight Falls (Raid);;Wrist|Voracious Wristwraps|Vorasius(Raid);;Gloves|Blind Oath's Touch|Raid ;;Belt|Arcanoweave Cord|Crafting/Misc;;Legs|Blind Oath's Leggings|Raid ;;Boots|Lightbinder Treads|Skyreach;;Ring|Eye of Midnight|Midnight Falls (Raid);;Ring|Omission of Light|Nexus Point Xenas;;Trinket|Litany of Lightblind Wrath|War Chaplain Senn (Raid);;Trinket|Vaelgor's Final Stare|Vaelgor & Ezzorak (Raid);;Weapon|Belo'melorn, the Shattered Talon|Belo'ren (Raid);;Off Hand|Aln'hara Lantern|Crafting/Misc",
+  "Priest_Holy:::Head|Blind Oath's Winged Crest|Raid ;;Neck|Amulet of the Abyssal Hymn|Midnight Falls (Raid);;Shoulders|Blind Oath's Seraphguards|Raid ;;Cloak|Imperator's Banner|Imperator Averzian (Raid);;Chest|Robes of Endless Oblivion|Midnight Falls (Raid);;Wrist|Blind Oath's Wraps|Raid ;;Gloves|Blind Oath's Touch|Raid ;;Belt|Arcanoweave Cord|Crafting/Misc;;Legs|Blind Oath's Leggings|Raid ;;Boots|Dream-Scorched Striders|Chimaerus;;Ring|Signet of the Starved Beast|Vorasius(Raid);;Ring|Sin'dorei Band of Hope|Belo'ren (Raid);;Trinket|Locus-Walker's Ribbon|Crown of the Cosmos (Raid);;Trinket|Litany of Lightblind Wrath|War Chaplain Senn (Raid);;Weapon|Weight of Command|Imperator Averzian(Raid);;Off Hand|Aln'hara Lantern|Crafting/Misc",
+  "Priest_Shadow:::Head|Blind Oath's Winged Crest|Raid | Catalyst;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Blind Oath's Seraphguards|Raid | Catalyst;;Cloak|Draconic Nullcape|Vaelgor & Ezzorak;;Chest|Blind Oath's Raiment|Raid | Catalyst;;Wrist|Wraps of Watchful Wrath|Magister's Terrace;;Gloves|Blind Oath's Touch|Raid | Catalyst;;Belt|Whisper-Inscribed Sash|Belo'ren;;Legs|Blind Oath's Leggings|Raid | Catalyst;;Boots|Dream-Scorched Striders|Chimaerus;;Ring|Eye of Midnight|Midnight Falls;;Ring|Bond of Light|Lightblinded Vanguard;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Vaelgor's Final Stare|Vaelgor & Ezzorak;;Weapon|Belo'melorn, the Shattered Talon|Belo'ren;;Off Hand|Tome of Alnscorned Regret|Chimaerus",
+  "Rogue_Assassination:::Weapon|Hungering Victory|Vorasius;;Off Hand|Farstrider's Mercy|Crafting;;Head|Masquerade of the Grim Jest|Tier Set;;Neck|Ribbon of Coiled Malice|Fallen-King Salhadaar;;Shoulders|Venom Casks of the Grim Jest|Tier Set;;Cloak|Defiant Defender's Drape|Magister's Terrace;;Chest|Fantastic Finery of the Grim Jest|Tier Set;;Wrist|Silvermoon Agent's Deflectors|Crafting;;Gloves|Sleight of Hand of the Grim Jest|Tier Set;;Belt|Scorn-Scarred Shul'ka's Belt|Chimaerus;;Legs|Legwraps of Lingering Legacies|Windrunner Spire;;Boots|Canopy Walker's Footwraps|Crown of the Cosmos;;Ring|Sin'dorei Band of Hope|Belo'ren;;Ring|Eye of Midnight|Midnight Falls;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Algeth'ar Puzzle Box|Algeth'ar Academy",
+  "Rogue_Outlaw:::Weapon|Arator's Swift Remembrance|Crown of the Cosmos;;Off Hand|Krick's Beetle Stabber|Pit of Saron;;Head|Voidlashed Hood|Seat of the Triumvirate;;Neck|Barbed Ymirheim Choker|Pit of Saron;;Shoulders|Venom Casks of the Grim Jest|Tier Set;;Cloak|Imperator's Banner|Imperator Averzian;;Chest|Fantastic Finery of the Grim Jest|Tier Set;;Wrist|Chewed Leather Wristguards|Pit of Saron;;Gloves|Sleight of Hand of the Grim Jest|Tier Set;;Belt|Scorn-Scarred Shul'ka's Belt|Chimaerus;;Legs|Blade Holsters of the Grim Jest|Tier Set;;Boots|Silvermoon Agent's Sneakers|Crafting;;Ring|Signet of the Starved Beast|Vorasius;;Ring|Masterwork Sin'dorei Band|Crafting;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Umbral Plume|Belo'ren",
+  "Rogue_Subtlety:::Head|Masquerade of the Grim Jest|Tier Set;;Neck|Eternal Voidsong Chain|Crown of the Cosmos;;Shoulders|Venom Casks of the Grim Jest|Tier Set;;Cloak|Rigid Scale Greatcloak|Skyreach;;Chest|Fantastic Finery of the Grim Jest|Tier Set;;Wrist|Void-Skinned Bracers|Vorasius;;Gloves|Sleight of Hand of the Grim Jest|Tier Set;;Belt|Silvermoon Agent's Utility Belt|Crafting;;Legs|Shaggy Wyrmleather Leggings|Pit of Saron;;Boots|Boots of Burning Focus|Skyreach;;Ring|Platinum Star Band|Algeth'ar Academy;;Ring|Bifurcation Band|Magister's Terrace;;Trinket|Light Company Guidon|Imperator Averzian;;Trinket|Gaze of the Alnseer|Chimaerus;;Weapon|Hungering Victory|Vorasius;;Off Hand|Farstrider's Mercy|Crafting",
+  "Shaman_Elemental:::Weapon|Excavating Cudgel|Windrunner Spire;;Off Hand|Ward of the Spellbreaker|Magister's Terrace;;Head|Locus of the Primal Core|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Tempests of the Primal Core|Tier Set;;Cloak|Guardian of the Primal Core|Catalyst;;Chest|Embrace of the Primal Core|Tier Set;;Wrist|Fallen King's Cuffs|Fallen-King Salhadaar;;Gloves|Earthgrips of the Primal Core|Tier Set;;Belt|World Tender's Barkclasp|Crafting;;Legs|Greaves of the Divine Guile|Nexus Point Xenas;;Boots|World Tender's Rootslippers|Crafting;;Ring|Platinum Star Band|Algeth'ar Academy;;Ring|Sin'dorei Band of Hope|Belo'ren;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Emberwing Feather|Windrunner Spire",
+  "Shaman_Enhancement:::Weapon|Clutchmates' Caress|Vaelgor & Ezzorak;;Off Hand|Farstrider's Chopper|Blacksmithing;;Head|Locus of the Primal Core|Catalyst / Raid / Vault;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Tempests of the Primal Core|Catalyst / Raid / Vault;;Cloak|Adherent's Silken Shroud|Tailoring;;Chest|Embrace of the Primal Core|Catalyst / Raid / Vault;;Wrist|Fallen King's Cuffs|Salhadaar;;Gloves|Earthgrips of the Primal Core|Catalyst / Raid / Vault;;Belt|Ceinture of the Primal Core|Catalyst;;Legs|Eternal Flame Scaleguards|Belo'ren;;Boots|Whipcoil Sabatons|Windrunner Spire;;Ring|Eye of Midnight|Midnight Falls;;Ring|Omission of Light|Nexus-Point Xenas;;Trinket|Radiant Plume|Belo'ren;;Trinket|Algeth'ar Puzzle Box|Algeth'ar Academy",
+  "Shaman_Restoration:::Head|Oblivion Guise|Midnight Falls;;Neck|Ribbon of Coiled Malice|Fallen-King Salhadaar;;Shoulders|Tempests of the Primal Core|Raid | Catalyst;;Cloak|Guardian of the Primal Core|Catalyst;;Chest|Embrace of the Primal Core|Raid | Catalyst;;Wrist|Cuffs of the Primal Core|Catalyst;;Gloves|Earthgrips of the Primal Core|Raid | Catalyst;;Belt|Waistcord of the Judged|Lightblinded Vanguard;;Legs|Leggings of the Primal Core|Raid | Catalyst;;Boots|Sabatons of Obscurement|Imperator Averzian;;Ring|Sin'dorei Band of Hope|Belo'ren;;Ring|Platinum Star Band|Algeth'ar Academy;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Litany of Lightblind Wrath|Lightblinded Vanguard;;Weapon|Weight of Command|Imperator Averzian;;Off Hand|Reflux Reflector|Nexus Point Xenas",
+  "Warlock_Affliction:::Weapon|Belo'melorn, the Shattered Talon|Belo'ren;;Off Hand|Grimoire of the Eternal Light|Vorasius;;Head|Abyssal Immolator's Smoldering Flames|Tier Set;;Neck|Eternal Voidsong Chain|Crown of the Cosmos;;Shoulders|Mantle of Dark Devotion|Windrunner Spire;;Cloak|Adherent's Silken Shroud|Crafting;;Chest|Abyssal Immolator's Dreadrobe|Tier Set;;Wrist|Martyr's Bindings|Crafted;;Gloves|Abyssal Immolator's Grasps|Tier Set;;Belt|Whisper-Inscribed Sash|Belo'ren;;Legs|Abyssal Immolator's Pillars|Tier Set;;Boots|Slippers of the Midnight Flame|Vaelgor;;Ring|Eye of Midnight|Midnight Falls;;Ring|Occlusion of Void|Nexus Point Xenas;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Emberwing Feather|Windrunner Spire",
+  "Warlock_Demonology:::Weapon|Belo'melorn, the Shattered Talon|Belo'ren;;Off Hand|Grimoire of the Eternal Light|Vorasius;;Head|Abyssal Immolator's Smoldering Flames|Tier Set;;Neck|Eternal Voidsong Chain|Crown of the Cosmos;;Shoulders|Echoing Void Mantle|Belo'ren;;Cloak|Adherent's Silken Shroud|Crafting;;Chest|Abyssal Immolator's Dreadrobe|Tier Set;;Wrist|Voracious Wristwraps|Vorasius;;Gloves|Abyssal Immolator's Grasps|Tier Set;;Belt|Whisper-Inscribed Sash|Belo'ren;;Legs|Abyssal Immolator's Pillars|Tier Set;;Boots|Slippers of the Midnight Flame|Vaelgor;;Ring|Eye of Midnight|Midnight Falls;;Ring|Signet of Azerothian Blessings|Crafting;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Vaelgor's Final Stare|Vaelgor",
+  "Warlock_Destruction:::Weapon|Belo'melorn, the Shattered Talon|Belo'ren;;Off Hand|Grimoire of the Eternal Light|Vorasius;;Head|Abyssal Immolator's Smoldering Flames|Tier Set;;Neck|Eternal Voidsong Chain|Crown of the Cosmos;;Shoulders|Echoing Void Mantle|Belo'ren;;Cloak|Adherent's Silken Shroud|Crafting;;Chest|Abyssal Immolator's Dreadrobe|Tier Set;;Wrist|Voracious Wristwraps|Vorasius;;Gloves|Abyssal Immolator's Grasps|Tier Set;;Belt|Whisper-Inscribed Sash|Belo'ren;;Legs|Abyssal Immolator's Pillars|Tier Set;;Boots|Slippers of the Midnight Flame|Vaelgor;;Ring|Eye of Midnight|Midnight Falls;;Ring|Signet of Azerothian Blessings|Crafting;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Vaelgor's Final Stare|Vaelgor",
+  "Warrior_Arms:::Head|Night Ender's Tusks|Tier Set;;Neck|Ribbon of Coiled Malice|Fallen-King Salhadaar;;Shoulders|Night Ender's Pauldrons|Tier Set;;Cloak|Adherent's Silken Shroud|Crafted;;Chest|Night Ender's Breastplate|Chimaerus;;Wrist|Spellbreaker's Bracers|Crafted;;Gloves|Embergrove Grasps|Windrunner Spire;;Belt|Night Ender's Girdle|Catalyst;;Legs|Night Ender's Chausses|Tier Set;;Boots|Greaves of the Unformed|Chimaerus;;Ring|Eye of Midnight|Midnight Falls;;Ring|Occlusion of Void|Nexus Point Xenas;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Heart of Ancient Hunger|Vorasius;;Weapon|Alah'endal, the Dawnsong|Midnight Falls",
+  "Warrior_Fury:::Head|Night Ender's Tusks|Tier Set;;Neck|Amulet of the Abyssal Hymn|Midnight Falls;;Shoulders|Night Ender's Pauldrons|Tier Set;;Cloak|Rigid Scale Greatcloak|Skyreach;;Chest|Night Ender's Breastplate|Chimaerus;;Wrist|Spellbreaker's Bracers|Crafted;;Gloves|Voidclaw Gauntlets|Seat of the Triumvirate;;Belt|Night Ender's Girdle|Catalyst;;Legs|Night Ender's Chausses|Tier Set;;Boots|Night Ender's Greatboots|Catalyst;;Ring|Eye of Midnight|Midnight Falls;;Ring|Platinum Star Band|Algeth'ar Academy;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Heart of Ancient Hunger|Vorasius;;Weapon|Bellamy's Final Judgement|Lightblinded Vanguard;;Off Hand|Blood Knight's Warblade|Crafted",
+  "Warrior_Protection:::Weapon|Turalyon's False Echo|Crown of the Cosmos;;Off Hand|Thalassian Dawnguard|Belo'ren;;Head|Night Ender's Tusks|Tier Set;;Neck|Eternal Voidsong Chain|Crown of the Cosmos;;Shoulders|Night Ender's Pauldrons|Tier Set;;Cloak|Draconic Nullcape|Vaelgor & Ezzorak;;Chest|Night Ender's Breastplate|Tier Set;;Wrist|Light's March Bracers|Imperator Averzian;;Gloves|Voidclaw Gauntlets|Seat of the Triumvirate;;Belt|Ezzorak's Gloombind|Vaelgor & Ezzorak;;Legs|Night Ender's Chausses|Tier Set;;Boots|Greaves of the Unformed|Chimaerus;;Ring|Eye of Midnight|Midnight Falls;;Ring|Band of the Triumvirate|Seat of the Triumvirate;;Trinket|Gaze of the Alnseer|Chimaerus;;Trinket|Heart of Ancient Hunger|Vorasius"
+];
+
+// Parse all BiS data
+bisRawData.forEach(line => {
+  const [spec, items] = line.split(':::');
+  const itemArray = items.split(';;').map(item => {
+    const [slot, name, source] = item.split('|');
+    return {slot: slot.trim(), item: name.trim(), source: source.trim()};
+  });
+  window.bisCache[spec] = {gear: itemArray, trinkets: []};
+});
+
+// ===== TRINKET TIER LIST (Raid Only) =====
+window.trinketTierList = {
+  S: [
+    {name:"Algeth'ar Puzzle Box", source:"Algeth'ar Academy"},
+    {name:"Radiant Plume", source:"Belo'ren"},
+    {name:"Umbral Plume", source:"Belo'ren"}
+  ],
+  A: [
+    {name:"Gaze of the Alnseer", source:"Chimaerus"},
+    {name:"Heart of Ancient Hunger", source:"Vorasius"}
+  ],
+  B: [
+    {name:"Light Company Guidon", source:"Imperator Averzian"},
+    {name:"Solarflare Prism", source:"Windrunner Spire"},
+    {name:"Heart of Wind", source:"Windrunner Spire"},
+    {name:"Kroluk's Warbanner", source:"Pit of Saron"}
+  ],
+  C: [
+    {name:"Undreamt God's Oozing Vestige", source:"Seat of the Triumvirate"},
+    {name:"Vessel of Tortured Souls", source:"Pit of Saron"},
+    {name:"Latch's Crooked Hook", source:"Maisara Caverns"},
+    {name:"Dragon Games Equipment", source:"Algeth'ar Academy"}
+  ],
+  D: [
+    {name:"Mark of Light", source:"Imperator Averzian"},
+    {name:"Void Stalker's Contract", source:"Seat of the Triumvirate"},
+    {name:"Forgotten Farstrider's Insignia", source:"Windrunner Spire"},
+    {name:"Lost Idol of the Hash'ey", source:"Maisara Caverns"}
+  ]
+};
+
+// Wowhead item icon helper
+window.wowheadIcon = function(itemName) {
+  const slug = itemName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  return 'https://wow.zamimg.com/images/wow/icons/medium/inv_misc_questionmark.blp';
+};
+
+// ===== TAB NAVIGATION =====
+function showStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('on'));
+  document.getElementById('s'+n).classList.add('active');
+  document.getElementById('n'+n).classList.add('on');
+  if (n === 2) updateS2Stats();
+  if (n === 3) updateS3Stats();
+  if (n === 4) renderClassGrid();
+  if (n === 5) renderLootHistory();
+}
+
+// ===== CLASS DATA =====
+const CD = {
+  death_knight:{armor:'plate',stats:['str']},demon_hunter:{armor:'leather',stats:['agi']},
+  druid:{armor:'leather',stats:['agi','int']},evoker:{armor:'mail',stats:['int']},
+  hunter:{armor:'mail',stats:['agi']},mage:{armor:'cloth',stats:['int']},
+  monk:{armor:'leather',stats:['agi','int']},paladin:{armor:'plate',stats:['str','int']},
+  priest:{armor:'cloth',stats:['int']},rogue:{armor:'leather',stats:['agi']},
+  shaman:{armor:'mail',stats:['agi','int']},warlock:{armor:'cloth',stats:['int']},
+  warrior:{armor:'plate',stats:['str']}
+};
+const CMAP={'Death Knight':'death_knight','Demon Hunter':'demon_hunter','Druid':'druid','Evoker':'evoker','Hunter':'hunter','Mage':'mage','Monk':'monk','Paladin':'paladin','Priest':'priest','Rogue':'rogue','Shaman':'shaman','Warlock':'warlock','Warrior':'warrior'};
+
+const SL = {head:'Head',neck:'Neck',shoulder:'Shoulder',back:'Back/Cloak',chest:'Chest',wrist:'Wrist',hands:'Hands',waist:'Waist',legs:'Legs',feet:'Feet',finger:'Ring',trinket:'Trinket',mh:'Main Hand',oh:'Off Hand'};
+const AL = {cloth:'Cloth',leather:'Leather',mail:'Mail',plate:'Plate',any:'Universal'};
+window.SL = SL; window.AL = AL;
+
+const CLASS_COLORS = {
+  'Death Knight':'#C41E3A','Demon Hunter':'#A330C9','Druid':'#FF7C0A','Evoker':'#33937F',
+  'Hunter':'#AAD372','Mage':'#3FC7EB','Monk':'#00FF98','Paladin':'#F48CBA',
+  'Priest':'#FFFFFF','Rogue':'#FFF468','Shaman':'#0070DD','Warlock':'#8788EE','Warrior':'#C69B6D'
+};
+const ROLE_ICONS = {tank:'🛡️',healer:'💚',dps:'⚔️',support:'🔮'};
+
+// ===== ITEM DATABASE (built from BiS data + class armor types) =====
+window.itemDB = {};
+bisRawData.forEach(line => {
+  const [specKey, items] = line.split(':::');
+  const className = specKey.split('_')[0];
+  const cl = CMAP[className] || className.toLowerCase();
+  const armorType = CD[cl] ? CD[cl].armor : 'cloth';
+  items.split(';;').forEach(entry => {
+    const parts = entry.split('|');
+    if (parts.length < 3) return;
+    const bisSlot = parts[0].trim(), itemName = parts[1].trim(), source = parts[2].trim();
+    const slotMap = {'Head':'head','Neck':'neck','Shoulders':'shoulder','Shoulder':'shoulder','Cloak':'back','Back':'back','Chest':'chest','Wrist':'wrist','Gloves':'hands','Hands':'hands','Belt':'waist','Waist':'waist','Legs':'legs','Boots':'feet','Feet':'feet','Ring':'finger','Trinket':'trinket','Weapon':'main_hand','Main Hand':'main_hand','Off Hand':'off_hand'};
+    const slot = slotMap[bisSlot] || bisSlot.toLowerCase();
+    const isAccessory = ['neck','finger','trinket','back'].includes(slot);
+    const key = itemName.toLowerCase();
+    if (!window.itemDB[key]) {
+      window.itemDB[key] = { name:itemName, slot, armor:isAccessory?'any':armorType, source, stat:'any', boss:source };
+    }
+  });
+});
+console.log('Item DB loaded: ' + Object.keys(window.itemDB).length + ' unique items');
+
+// ===== STATE =====
+window.roster = [];
+window.selectedPlayers = new Set();
+window.bossCount = 1;
+window.analyzedItems = [];
+window.selectedClass = null;
+
+// ===== ALGORITHM WEIGHTS — 3 factors only (persisted in localStorage) =====
+window.algoWeights = JSON.parse(localStorage.getItem('ek_algo_weights_v2') || 'null') || {
+  drop: 50, wcl: 30, att: 20
+};
+
+window.saveWeights = function() {
+  localStorage.setItem('ek_algo_weights_v2', JSON.stringify(window.algoWeights));
+};
+
+window.updateWeights = function() {
+  const keys = ['drop','wcl','att'];
+  keys.forEach(k => {
+    const slider = document.getElementById('ws_' + k);
+    if (slider) {
+      window.algoWeights[k] = parseInt(slider.value);
+      const label = document.getElementById('wv_' + k);
+      if (label) label.textContent = slider.value + '%';
+    }
+  });
+  const total = keys.reduce((s,k) => s + window.algoWeights[k], 0);
+  const totalEl = document.getElementById('weightsTotal');
+  if (totalEl) {
+    const cls = total === 100 ? 'ok' : 'warn';
+    totalEl.innerHTML = 'Total: <span class="' + cls + '">' + total + '%</span>' + (total !== 100 ? ' — ajusta para que sume 100%' : ' ✓');
+  }
+  window.saveWeights();
+};
+
+window.applyPreset = function(preset) {
+  const presets = {
+    balanced:    { drop:50, wcl:30, att:20 },
+    simfirst:    { drop:70, wcl:20, att:10 },
+    performance: { drop:30, wcl:50, att:20 }
+  };
+  const p = presets[preset];
+  if (!p) return;
+  Object.keys(p).forEach(k => {
+    window.algoWeights[k] = p[k];
+    const slider = document.getElementById('ws_' + k);
+    if (slider) slider.value = p[k];
+  });
+  window.updateWeights();
+  toast('Preset "' + preset + '" aplicado', true);
+};
+
+window.initWeightSliders = function() {
+  Object.keys(window.algoWeights).forEach(k => {
+    const slider = document.getElementById('ws_' + k);
+    if (slider) slider.value = window.algoWeights[k];
+    const label = document.getElementById('wv_' + k);
+    if (label) label.textContent = window.algoWeights[k] + '%';
+  });
+  window.updateWeights();
+};
+
+// ===== DROPTIMIZER BACKEND URL =====
+// Paste your Google Apps Script Web App URL here to enable auto-sync
+const BACKEND_URL = '';  // <-- PASTE YOUR APPS SCRIPT URL HERE
+
+// ===== DROPTIMIZER DATA (persisted in localStorage) =====
+window.droptimizerData = JSON.parse(localStorage.getItem('ek_droptimizer') || '{}');
+// Format: { "PlayerName": { "itemname_lowercase": { item: "Item Name", gain: 12500, source: "Boss" }, ... }, ... }
+
+// ===== SYNC FROM BACKEND =====
+window.syncFromBackend = async function() {
+  if (!BACKEND_URL) {
+    toast('Backend no configurado. Pega la URL de tu Apps Script en BACKEND_URL.', false);
+    return;
+  }
+  const btn = document.getElementById('syncBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Syncing...'; }
+  try {
+    const resp = await fetch(BACKEND_URL + '?action=session');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error || 'Error del servidor');
+
+    let imported = 0;
+    (result.submissions || []).forEach(sub => {
+      const player = sub.player;
+      if (!player) return;
+      // Parse rawUpgrades JSON
+      let upgrades = [];
+      try { upgrades = JSON.parse(sub.rawUpgrades || '[]'); } catch(e) {}
+      if (!upgrades.length) {
+        // Fallback: parse ekDropCode
+        const code = sub.ekDropCode || '';
+        if (code.startsWith('EK-DROP|')) {
+          const parts = code.split('|');
+          if (parts.length >= 4) {
+            parts[3].split(',').forEach(pair => {
+              const lc = pair.lastIndexOf(':');
+              if (lc > 0) {
+                const item = pair.substring(0, lc).trim();
+                const gain = parseInt(pair.substring(lc + 1));
+                if (item && gain > 0) upgrades.push({ item, gain });
+              }
+            });
+          }
+        }
+      }
+      if (upgrades.length > 0) {
+        if (!window.droptimizerData[player]) window.droptimizerData[player] = {};
+        window.droptimizerData[player]._baseDps = Number(sub.baseDps) || 0;
+        window.droptimizerData[player]._submittedAt = sub.timestamp || new Date().toISOString();
+        // Dedupe: best gain per item
+        const best = {};
+        upgrades.forEach(u => {
+          const key = (u.item || '').toLowerCase();
+          if (key && (u.gain || 0) > 0) {
+            if (!best[key] || u.gain > best[key].gain) best[key] = { item: u.item, gain: u.gain, source: 'Raidbots' };
+          }
+        });
+        Object.entries(best).forEach(([key, val]) => { window.droptimizerData[player][key] = val; });
+        imported++;
+      }
+    });
+
+    if (imported > 0) {
+      window.saveDroptimizerData();
+      toast('☁️ Sync completo: ' + imported + ' raiders importados del servidor (fecha: ' + (result.date || 'hoy') + ')', true);
+    } else {
+      toast('Sin submissions nuevas en el servidor para hoy.', false);
+    }
+  } catch(e) {
+    toast('Error al conectar con backend: ' + e.message, false);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '☁️ Sync Server'; }
+  }
+};
+
+// ===== MIXED DROPTIMIZER IMPORT (EK-DROP codes + Raidbots URLs) =====
+window.importMixedDroptimizer = async function() {
+  const text = document.getElementById('ekDropCodes').value.trim();
+  if (!text) { toast('Pega codigos EK-DROP o URLs de Raidbots', false); return; }
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  let totalItems = 0, totalPlayers = 0, failedUrls = 0;
+
+  for (const line of lines) {
+    // EK-DROP code
+    if (line.startsWith('EK-DROP|')) {
+      const parts = line.split('|');
+      if (parts.length < 4) continue;
+      const playerName = parts[1];
+      const itemPairs = parts[3].split(',');
+      if (!window.droptimizerData[playerName]) window.droptimizerData[playerName] = {};
+      window.droptimizerData[playerName]._baseDps = parseInt(parts[2]) || 0;
+      window.droptimizerData[playerName]._submittedAt = new Date().toISOString();
+      let pc = 0;
+      itemPairs.forEach(pair => {
+        const lc = pair.lastIndexOf(':');
+        if (lc === -1) return;
+        const itemName = pair.substring(0, lc).trim();
+        const gain = parseInt(pair.substring(lc + 1));
+        if (itemName && gain > 0) {
+          window.droptimizerData[playerName][itemName.toLowerCase()] = { item: itemName, gain, source: 'Raidbots' };
+          pc++;
+        }
+      });
+      if (pc > 0) { totalPlayers++; totalItems += pc; }
+    }
+    // Raidbots URL
+    else if (line.includes('raidbots.com')) {
+      const m = line.match(/report\/([a-zA-Z0-9]+)/);
+      if (!m) continue;
+      try {
+        const resp = await fetch('https://www.raidbots.com/reports/' + m[1] + '/data.json');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        const count = window.processRaidbotsJson(data);
+        if (count > 0) { totalPlayers++; totalItems += count; }
+      } catch(e) { failedUrls++; }
+    }
+  }
+  if (totalItems > 0) {
+    window.saveDroptimizerData();
+    document.getElementById('ekDropCodes').value = '';
+    renderSessionGrid();
+    toast('✅ ' + totalItems + ' items de ' + totalPlayers + ' raiders importados' + (failedUrls ? ' (' + failedUrls + ' URLs fallaron)' : ''), true);
+  } else {
+    toast('No se pudieron importar datos. Verifica el formato.', false);
+  }
+};
+
+// Process a full Raidbots data.json object
+window.processRaidbotsJson = function(data) {
+  const baseDps = data.sim.players[0].collected_data.dps.mean;
+  const playerRaw = data.sim.players[0].name;
+  const playerName = playerRaw.charAt(0).toUpperCase() + playerRaw.slice(1);
+  const profilesets = data.sim.profilesets.results;
+  const rawForm = data.simbot?.meta?.rawFormData;
+  const dropItems = rawForm?.droptimizerItems || [];
+  const itemLookup = {};
+  dropItems.forEach(entry => { itemLookup[entry.id] = { name: entry.item?.name || 'Unknown' }; });
+  if (!window.droptimizerData[playerName]) window.droptimizerData[playerName] = {};
+  window.droptimizerData[playerName]._baseDps = Math.round(baseDps);
+  window.droptimizerData[playerName]._submittedAt = new Date().toISOString();
+  let count = 0;
+  const bestPerItem = {};
+  profilesets.forEach(p => {
+    const info = itemLookup[p.name] || {};
+    const itemName = info.name || p.name.split('/').pop() || '?';
+    const gain = Math.round(p.mean - baseDps);
+    if (gain > 0) {
+      const key = itemName.toLowerCase();
+      if (!bestPerItem[key] || gain > bestPerItem[key].gain) bestPerItem[key] = { item: itemName, gain, source: 'Raidbots' };
+    }
+  });
+  Object.entries(bestPerItem).forEach(([key, val]) => { window.droptimizerData[playerName][key] = val; count++; });
+  return count;
+};
+
+// ===== SESSION TRACKER: who submitted, who missing =====
+window.refreshDroptimizerSession = function() { renderSessionGrid(); };
+
+function renderSessionGrid() {
+  const grid = document.getElementById('sessionGrid');
+  if (!grid) return;
+  const selected = window.roster.filter(p => window.selectedPlayers.has(p.uid || p.nm));
+  const submitted = [];
+  const missing = [];
+  selected.forEach(p => {
+    const name = p.nm;
+    const data = window.droptimizerData[name];
+    const hasData = data && Object.keys(data).filter(k => !k.startsWith('_')).length > 0;
+    if (hasData) {
+      const itemCount = Object.keys(data).filter(k => !k.startsWith('_')).length;
+      const submittedAt = data._submittedAt ? new Date(data._submittedAt) : null;
+      const timeAgo = submittedAt ? getTimeAgo(submittedAt) : '';
+      submitted.push({ name, class: p.cN, itemCount, timeAgo, baseDps: data._baseDps || 0 });
+    } else {
+      missing.push({ name, class: p.cN });
+    }
+  });
+  // Update stats
+  const subEl = document.getElementById('sessionSubmitted');
+  const misEl = document.getElementById('sessionMissing');
+  const updEl = document.getElementById('sessionLastUpdate');
+  if (subEl) subEl.textContent = submitted.length + '/' + selected.length;
+  if (misEl) misEl.textContent = missing.length;
+  if (updEl) updEl.textContent = new Date().toLocaleTimeString();
+  // Render grid
+  let html = '';
+  submitted.sort((a,b) => a.name.localeCompare(b.name)).forEach(p => {
+    const cc = CLASS_COLORS[p.class] || '#fff';
+    html += '<div style="background:#1a2e1a;border:1px solid #2ecc40;border-radius:8px;padding:8px 10px;font-size:12px;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+    html += '<span style="color:'+cc+';font-weight:bold;">✅ '+p.name+'</span>';
+    html += '<span style="color:#2ecc40;font-size:11px;">'+p.itemCount+' items</span></div>';
+    html += '<div style="color:#555;font-size:10px;">'+p.timeAgo+(p.baseDps ? ' • '+p.baseDps.toLocaleString()+' DPS base' : '')+'</div></div>';
+  });
+  missing.sort((a,b) => a.name.localeCompare(b.name)).forEach(p => {
+    const cc = CLASS_COLORS[p.class] || '#fff';
+    html += '<div style="background:#2e1a1a;border:1px solid #444;border-radius:8px;padding:8px 10px;font-size:12px;">';
+    html += '<span style="color:'+cc+';font-weight:bold;">❌ '+p.name+'</span>';
+    html += '<div style="color:#666;font-size:10px;">Sin droptimizer</div></div>';
+  });
+  grid.innerHTML = html || '<div style="color:#666;text-align:center;padding:16px;">Selecciona jugadores y importa datos de Droptimizer</div>';
+}
+
+function getTimeAgo(date) {
+  const now = new Date();
+  const diff = Math.floor((now - date) / 1000);
+  if (diff < 60) return 'hace ' + diff + 's';
+  if (diff < 3600) return 'hace ' + Math.floor(diff/60) + 'min';
+  if (diff < 86400) return 'hace ' + Math.floor(diff/3600) + 'h';
+  return 'hace ' + Math.floor(diff/86400) + 'd';
+}
+
+window.saveDroptimizerData = function() {
+  localStorage.setItem('ek_droptimizer', JSON.stringify(window.droptimizerData));
+  renderDroptimizerEntries();
+};
+
+window.getDroptimizerScore = function(playerName, itemName) {
+  const playerData = window.droptimizerData[playerName];
+  if (!playerData) return 0;
+  const itemKey = itemName.toLowerCase().trim();
+  const getMaxGain = () => {
+    const allGains = Object.entries(window.droptimizerData).flatMap(([,pd]) =>
+      Object.entries(pd).filter(([k]) => !k.startsWith('_')).map(([,e]) => e.gain || 0));
+    return Math.max(...allGains, 1);
+  };
+  // Direct match
+  if (playerData[itemKey] && !itemKey.startsWith('_')) {
+    return Math.min(1, playerData[itemKey].gain / getMaxGain());
+  }
+  // Fuzzy match (partial name)
+  for (const key of Object.keys(playerData)) {
+    if (key.startsWith('_')) continue;
+    if (key.includes(itemKey) || itemKey.includes(key)) {
+      return Math.min(1, playerData[key].gain / getMaxGain());
+    }
+  }
+  return 0;
+};
+
+window.parseDroptimizerInput = function() {
+  const text = document.getElementById('droptimizerText').value.trim();
+  if (!text) { toast('Pega datos de Droptimizer primero', false); return; }
+
+  let count = 0;
+
+  // Try JSON format first (Raidbots export)
+  try {
+    const json = JSON.parse(text);
+    if (json.sim && json.sim.players) {
+      // Full Raidbots JSON
+      const player = json.sim.players[0];
+      const playerName = player.name;
+      if (!window.droptimizerData[playerName]) window.droptimizerData[playerName] = {};
+      if (json.profilesets && json.profilesets.results) {
+        json.profilesets.results.forEach(r => {
+          const itemName = r.name.replace(/_/g, ' ');
+          const gain = r.mean - (json.sim.players[0].collected_data.dps.mean || 0);
+          if (gain > 0) {
+            window.droptimizerData[playerName][itemName.toLowerCase()] = { item: itemName, gain: Math.round(gain), source: 'Raidbots' };
+            count++;
+          }
+        });
+      }
+    } else if (Array.isArray(json)) {
+      // Array of {player, item, gain} objects
+      json.forEach(e => {
+        const pn = e.player || e.name || e.playerName;
+        if (!pn) return;
+        if (!window.droptimizerData[pn]) window.droptimizerData[pn] = {};
+        window.droptimizerData[pn][(e.item||e.itemName||'').toLowerCase()] = {
+          item: e.item || e.itemName, gain: parseInt(e.gain || e.dpsGain || 0), source: e.source || e.boss || 'Manual'
+        };
+        count++;
+      });
+    }
+    if (count > 0) {
+      window.saveDroptimizerData();
+      document.getElementById('droptimizerText').value = '';
+      toast('✅ ' + count + ' items importados (JSON)', true);
+      return;
+    }
+  } catch(e) { /* not JSON, try line format */ }
+
+  // Line format: PlayerName | ItemName | DPSGain [| Source]
+  const lines = text.split('\n').filter(l => l.trim());
+  lines.forEach(line => {
+    // Support | or tab or comma as separator
+    const parts = line.split(/[|\t]/).map(p => p.trim());
+    if (parts.length >= 3) {
+      const playerName = parts[0], itemName = parts[1], gain = parseInt(parts[2].replace(/[^0-9]/g, ''));
+      const source = parts[3] || 'Manual';
+      if (playerName && itemName && gain > 0) {
+        if (!window.droptimizerData[playerName]) window.droptimizerData[playerName] = {};
+        window.droptimizerData[playerName][itemName.toLowerCase()] = { item: itemName, gain, source };
+        count++;
+      }
+    } else if (parts.length === 2) {
+      // ItemName | DPSGain (no player name — prompt for it)
+      toast('Incluye el nombre del jugador: Player | Item | DPSGain', false);
+      return;
+    }
+  });
+
+  if (count > 0) {
+    window.saveDroptimizerData();
+    document.getElementById('droptimizerText').value = '';
+    toast('✅ ' + count + ' items importados', true);
+  } else {
+    toast('No se pudieron parsear los datos. Usa formato: Player | Item | DPSGain', false);
+  }
+};
+
+window.exportDroptimizerData = function() {
+  const entries = Object.entries(window.droptimizerData);
+  if (!entries.length) { toast('No hay datos de Droptimizer', false); return; }
+  const blob = new Blob([JSON.stringify(window.droptimizerData, null, 2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'ek-droptimizer-' + new Date().toISOString().split('T')[0] + '.json';
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('Droptimizer data exportada', true);
+};
+
+window.clearDroptimizerData = function() {
+  if (!Object.keys(window.droptimizerData).length) { toast('No hay datos', false); return; }
+  if (confirm('¿Limpiar toda la data de Droptimizer?')) {
+    window.droptimizerData = {};
+    localStorage.removeItem('ek_droptimizer');
+    renderDroptimizerEntries();
+    toast('Droptimizer data limpiada', true);
+  }
+};
+
+window.removeDroptimizerPlayer = function(playerName) {
+  delete window.droptimizerData[playerName];
+  window.saveDroptimizerData();
+};
+
+window.importDroptimizerFile = function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('droptimizerText').value = e.target.result;
+    parseDroptimizerInput();
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+};
+
+function renderDroptimizerEntries() {
+  const countEl = document.getElementById('droptimizerCount');
+  const players = Object.entries(window.droptimizerData);
+  const totalItems = players.reduce((s, [,items]) => s + Object.keys(items).filter(k => !k.startsWith('_')).length, 0);
+  if (countEl) countEl.textContent = totalItems + ' items de ' + players.length + ' jugadores';
+  renderSessionGrid();
+}
+
+// ===== TIER SET TRACKING (persisted in localStorage) =====
+// Format: { "PlayerName": { head:bool, shoulder:bool, chest:bool, hands:bool, legs:bool } }
+window.tierData = JSON.parse(localStorage.getItem('ek_tier_data') || '{}');
+const TIER_SLOTS = ['head','shoulder','chest','hands','legs'];
+const TIER_SLOT_LABELS = {head:'H',shoulder:'S',chest:'C',hands:'G',legs:'L'};
+const TIER_SLOT_NAMES = {head:'Head',shoulder:'Shoulders',chest:'Chest',hands:'Hands',legs:'Legs'};
+const TIER_SLOT_ICONS = {head:'👑',shoulder:'🛡️',chest:'🦺',hands:'🧤',legs:'👖'};
+
+window.saveTierData = function() {
+  localStorage.setItem('ek_tier_data', JSON.stringify(window.tierData));
+};
+
+window.getTierCount = function(playerName) {
+  const pd = window.tierData[playerName];
+  if (!pd) return 0;
+  return TIER_SLOTS.filter(s => pd[s]).length;
+};
+
+window.getPlayerTierSlots = function(playerName) {
+  return window.tierData[playerName] || {head:false,shoulder:false,chest:false,hands:false,legs:false};
+};
+
+window.toggleTierSlot = function(playerName, slot) {
+  if (!window.tierData[playerName]) {
+    window.tierData[playerName] = {head:false,shoulder:false,chest:false,hands:false,legs:false};
+  }
+  window.tierData[playerName][slot] = !window.tierData[playerName][slot];
+  window.saveTierData();
+  renderTierGrid();
+};
+
+window.isTierSlot = function(slotName) {
+  // Map various slot labels to tier slots
+  const tierSlotMap = {
+    'head':'head','Head':'head','helm':'head','Helm':'head',
+    'shoulder':'shoulder','Shoulder':'shoulder','shoulders':'shoulder','Shoulders':'shoulder',
+    'chest':'chest','Chest':'chest','robe':'chest','Robe':'chest',
+    'hands':'hands','Hands':'hands','gloves':'hands','Gloves':'hands',
+    'legs':'legs','Legs':'legs','leggings':'legs','Leggings':'legs'
+  };
+  return tierSlotMap[slotName] || null;
+};
+
+window.getTierBadgeHTML = function(playerName, currentSlot) {
+  const count = window.getTierCount(playerName);
+  const tierSlot = window.isTierSlot(currentSlot);
+  const hasThisSlot = tierSlot ? (window.getPlayerTierSlots(playerName)[tierSlot] || false) : false;
+
+  let newCount = count;
+  let completesBonus = '';
+  if (tierSlot && !hasThisSlot) {
+    newCount = count + 1;
+    if (newCount === 2) completesBonus = ' → 2pc!';
+    else if (newCount === 4) completesBonus = ' → 4pc!';
+  } else if (tierSlot && hasThisSlot) {
+    completesBonus = ' (ya tiene)';
+  }
+
+  const cls = 'tier-' + count;
+  const pulseClass = (completesBonus.includes('2pc') || completesBonus.includes('4pc')) ? ' tier-complete' : '';
+
+  if (!tierSlot) return ''; // Not a tier slot, no badge
+
+  let label = count + '/5';
+  let color = '#666';
+  if (count === 0) color = '#666';
+  else if (count === 1) color = '#aaa';
+  else if (count === 2) color = '#2ecc40';
+  else if (count === 3) color = '#ffd700';
+  else if (count >= 4) color = '#ff44ff';
+
+  let bg = '#333';
+  if (completesBonus.includes('2pc')) { bg = '#1a4a1a'; color = '#00ff88'; }
+  else if (completesBonus.includes('4pc')) { bg = '#4a1a4a'; color = '#ff88ff'; }
+
+  return '<span class="tier-badge' + pulseClass + '" style="background:'+bg+';color:'+color+';" title="Tier: '+count+'/5'+completesBonus+'">🛡️'+count+'/5'+completesBonus+'</span>';
+};
+
+window.autoDetectTierFromLoot = function() {
+  // Auto-detect tier pieces from loot history
+  const tierSlotNames = ['head','shoulder','chest','hands','legs','helm','shoulders','gloves','leggings'];
+  let detected = 0;
+  window.lootHistory.forEach(e => {
+    const slot = window.isTierSlot(e.slot);
+    if (slot) {
+      // Check if item name contains "tier" or known tier token patterns
+      const itemLower = (e.item || '').toLowerCase();
+      const isTier = itemLower.includes('tier') || itemLower.includes('token') ||
+                     itemLower.includes('zenith') || itemLower.includes('dreadfire') ||
+                     itemLower.includes('parasitic') || itemLower.includes('crystalline') ||
+                     itemLower.includes('runescribed') || itemLower.includes('titanic');
+      if (isTier || slot) {
+        // For now, any loot in a tier slot counts
+        if (!window.tierData[e.player]) {
+          window.tierData[e.player] = {head:false,shoulder:false,chest:false,hands:false,legs:false};
+        }
+        if (!window.tierData[e.player][slot]) {
+          window.tierData[e.player][slot] = true;
+          detected++;
+        }
+      }
+    }
+  });
+  window.saveTierData();
+  renderTierGrid();
+  toast(detected > 0 ? '✅ ' + detected + ' piezas de tier detectadas del loot history' : 'No se detectaron piezas de tier nuevas', detected > 0);
+};
+
+window.exportTierData = function() {
+  if (!Object.keys(window.tierData).length) { toast('No hay tier data', false); return; }
+  const blob = new Blob([JSON.stringify(window.tierData, null, 2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'ek-tier-data-' + new Date().toISOString().split('T')[0] + '.json';
+  a.click(); URL.revokeObjectURL(a.href);
+};
+
+window.clearTierData = function() {
+  if (!Object.keys(window.tierData).length) { toast('No hay tier data', false); return; }
+  if (confirm('¿Limpiar toda la tier data?')) {
+    window.tierData = {};
+    localStorage.removeItem('ek_tier_data');
+    renderTierGrid();
+    toast('Tier data limpiada', true);
+  }
+};
+
+function renderTierGrid() {
+  const grid = document.getElementById('tierGrid');
+  if (!grid) return;
+
+  // Only show selected players (in raid)
+  const raidPlayers = window.roster.filter(p => window.selectedPlayers.has(p.uid||p.nm));
+  if (!raidPlayers.length) {
+    grid.innerHTML = '<div style="color:#666;text-align:center;padding:12px;">Importa y selecciona el roster primero</div>';
+    return;
+  }
+
+  let html = '';
+  // Header row
+  html += '<div style="grid-column:1/-1;display:flex;gap:4px;padding:0 0 4px 100px;font-size:10px;color:#888;">';
+  TIER_SLOTS.forEach(s => {
+    html += '<div style="width:28px;text-align:center;">' + TIER_SLOT_ICONS[s] + '</div>';
+  });
+  html += '<div style="margin-left:auto;width:50px;text-align:center;">Total</div></div>';
+
+  // Sort: mains first, then by tier count desc, then by name
+  const sorted = raidPlayers.sort((a,b) => {
+    if (a.isMain !== b.isMain) return a.isMain ? -1 : 1;
+    const ta = window.getTierCount(a.nm), tb = window.getTierCount(b.nm);
+    if (ta !== tb) return tb - ta;
+    return a.nm.localeCompare(b.nm);
+  });
+
+  sorted.forEach(p => {
+    const cc = CLASS_COLORS[p.cN] || '#aaa';
+    const count = window.getTierCount(p.nm);
+    const slots = window.getPlayerTierSlots(p.nm);
+
+    let countColor = '#666';
+    let countBg = '#333';
+    if (count >= 4) { countColor = '#ff44ff'; countBg = '#4a1e3a'; }
+    else if (count >= 2) { countColor = '#2ecc40'; countBg = '#1e3a1e'; }
+    else if (count >= 1) { countColor = '#ffd700'; countBg = '#3a3a1e'; }
+
+    html += '<div class="tier-player-row">';
+    html += '<span class="tier-player-name" style="color:'+cc+';">'+p.nm+'</span>';
+    html += '<div class="tier-slots">';
+    TIER_SLOTS.forEach(s => {
+      const has = slots[s];
+      html += '<div class="tier-slot'+(has?' has':'')+'" onclick="toggleTierSlot(\''+p.nm.replace(/'/g,"\\'")+'\',\''+s+'\')" title="'+TIER_SLOT_NAMES[s]+(has?' ✓':'')+'">';
+      html += has ? '✓' : TIER_SLOT_LABELS[s];
+      html += '</div>';
+    });
+    html += '</div>';
+    html += '<span class="tier-count" style="background:'+countBg+';color:'+countColor+';">'+count+'/5</span>';
+
+    // Show set bonus status
+    let bonusText = '';
+    if (count >= 4) bonusText = '<span style="color:#ff44ff;font-size:10px;margin-left:4px;">4pc ✓</span>';
+    else if (count >= 2) bonusText = '<span style="color:#2ecc40;font-size:10px;margin-left:4px;">2pc ✓</span>';
+    html += bonusText;
+    html += '</div>';
+  });
+
+  grid.innerHTML = html;
+}
+
+// ===== LOOT HISTORY (persisted in localStorage) =====
+window.lootHistory = JSON.parse(localStorage.getItem('ek_loot_history') || '[]');
+
+window.saveLootHistory = function() {
+  localStorage.setItem('ek_loot_history', JSON.stringify(window.lootHistory));
+};
+
+window.assignLoot = function(item, difficulty, ilvl, slot, armor, playerName, playerClass, playerSpec, playerRole) {
+  const entry = {
+    id: Date.now(),
+    item, difficulty, ilvl, slot, armor,
+    player: playerName, class: playerClass, spec: playerSpec, role: playerRole,
+    date: new Date().toISOString().split('T')[0],
+    timestamp: Date.now()
+  };
+  window.lootHistory.push(entry);
+  window.saveLootHistory();
+  // Auto-update tier tracking if this is a tier slot
+  const tierSlot = window.isTierSlot(slot);
+  if (tierSlot) {
+    if (!window.tierData[playerName]) {
+      window.tierData[playerName] = {head:false,shoulder:false,chest:false,hands:false,legs:false};
+    }
+    window.tierData[playerName][tierSlot] = true;
+    window.saveTierData();
+    const newCount = window.getTierCount(playerName);
+    const bonusMsg = newCount === 2 ? ' — ¡Completa 2pc!' : newCount === 4 ? ' — ¡Completa 4pc!' : '';
+    toast('✅ ' + item + ' asignado a ' + playerName + ' (Tier: ' + newCount + '/5' + bonusMsg + ')', true);
+    renderTierGrid();
+  } else {
+    toast('✅ ' + item + ' asignado a ' + playerName, true);
+  }
+  return entry;
+};
+
+window.removeLootEntry = function(id) {
+  window.lootHistory = window.lootHistory.filter(e => e.id !== id);
+  window.saveLootHistory();
+  renderLootHistory();
+};
+
+window.getLootCount = function(playerName) {
+  return window.lootHistory.filter(e => e.player === playerName && (e.response === 'BIS' || e.response === 'Upgrade' || !e.source)).length;
+};
+
+window.getLootFairnessScore = function(playerName) {
+  const relevant = window.lootHistory.filter(e => e.response === 'BIS' || e.response === 'Upgrade' || !e.source);
+  if (!relevant.length) return 0.5;
+  const counts = {};
+  window.roster.filter(p => window.selectedPlayers.has(p.uid||p.nm)).forEach(p => { counts[p.nm] = 0; });
+  relevant.forEach(e => { if (counts[e.player] !== undefined) counts[e.player]++; });
+  const values = Object.values(counts);
+  if (!values.length) return 0.5;
+  const max = Math.max(...values, 1);
+  const playerCount = counts[playerName] || 0;
+  // 1.0 = received nothing (highest priority), 0.0 = received the most (lowest priority)
+  return 1.0 - (playerCount / max);
+};
+
+function renderLootHistory() {
+  // Filter: only BIS and Upgrade
+  const filtered = window.lootHistory.filter(e => e.response === 'BIS' || e.response === 'Upgrade' || !e.source);
+  // Summary cards per player
+  const counts = {};
+  filtered.forEach(e => {
+    if (!counts[e.player]) counts[e.player] = { count:0, class:e.class, bis:0, upg:0 };
+    counts[e.player].count++;
+    if (e.response === 'BIS') counts[e.player].bis++;
+    else if (e.response === 'Upgrade') counts[e.player].upg++;
+  });
+
+  const summaryDiv = document.getElementById('lootSummary');
+  if (!filtered.length) {
+    summaryDiv.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No hay loot asignado. Importa tu CSV de RCLootCouncil o asigna loot desde los resultados.</div>';
+    document.getElementById('lootTable').innerHTML = '';
+    return;
+  }
+
+  // Stats bar
+  const totalBIS = filtered.filter(e => e.response === 'BIS').length;
+  const totalUpg = filtered.filter(e => e.response === 'Upgrade').length;
+  const dates = [...new Set(filtered.map(e => e.date))].sort();
+
+  let sHtml = '<div style="display:flex;gap:16px;font-size:13px;margin-bottom:10px;flex-wrap:wrap;">';
+  sHtml += '<span><span class="lbl">Total:</span> <span class="val">' + filtered.length + '</span></span>';
+  sHtml += '<span><span class="lbl">BIS:</span> <span style="color:#2ecc40;font-weight:bold;">' + totalBIS + '</span></span>';
+  sHtml += '<span><span class="lbl">Upgrade:</span> <span style="color:#3498db;font-weight:bold;">' + totalUpg + '</span></span>';
+  sHtml += '<span><span class="lbl">Raids:</span> <span class="val">' + dates.length + '</span></span>';
+  sHtml += '<span><span class="lbl">Jugadores:</span> <span class="val">' + Object.keys(counts).length + '</span></span>';
+  sHtml += '</div>';
+
+  // Summary cards
+  sHtml += '<div class="loot-summary-grid">';
+  Object.entries(counts).sort((a,b) => b[1].count - a[1].count).forEach(([name, data]) => {
+    const cc = CLASS_COLORS[data.class] || '#fff';
+    const breakdown = [];
+    if (data.bis) breakdown.push('<span style="color:#2ecc40;">' + data.bis + ' BIS</span>');
+    if (data.upg) breakdown.push('<span style="color:#3498db;">' + data.upg + ' Upg</span>');
+    sHtml += '<div class="loot-summary-card"><div><span style="color:'+cc+';font-weight:bold;">'+name+'</span>';
+    sHtml += '<div style="color:#888;font-size:10px;">'+breakdown.join(' · ')+'</div></div>';
+    sHtml += '<div class="loot-count">'+data.count+'</div></div>';
+  });
+  sHtml += '</div>';
+  summaryDiv.innerHTML = sHtml;
+
+  // Full table with response type, boss, notes
+  let tHtml = '<table class="loot-table"><thead><tr><th>Fecha</th><th>Item</th><th>Slot</th><th>Diff</th><th>Boss</th><th>Jugador</th><th>Tipo</th><th>Nota</th><th></th></tr></thead><tbody>';
+  filtered.slice().reverse().forEach(e => {
+    const cc = CLASS_COLORS[e.class] || '#fff';
+    const respColor = e.response === 'BIS' ? '#2ecc40' : e.response === 'Upgrade' ? '#3498db' : '#888';
+    tHtml += '<tr><td style="color:#888;">'+e.date+'</td>';
+    tHtml += '<td style="color:#a335ee;font-weight:bold;">'+e.item+'</td>';
+    tHtml += '<td>'+(e.slot||'')+'</td>';
+    tHtml += '<td>'+(e.difficulty||'')+'</td>';
+    tHtml += '<td style="color:#ff8844;font-size:11px;">'+(e.boss||'')+'</td>';
+    tHtml += '<td style="color:'+cc+';font-weight:bold;">'+e.player+'</td>';
+    tHtml += '<td style="color:'+respColor+';font-size:11px;font-weight:bold;">'+(e.response||'')+'</td>';
+    tHtml += '<td style="color:#666;font-size:11px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(e.note||'').replace(/"/g,'&quot;')+'">'+(e.note||'')+'</td>';
+    tHtml += '<td><span class="loot-delete" onclick="window.removeLootEntry('+e.id+')" title="Eliminar">✕</span></td></tr>';
+  });
+  tHtml += '</tbody></table>';
+  document.getElementById('lootTable').innerHTML = tHtml;
+}
+window.selectedSpec = null;
+
+// ===== RCLOOTCOUNCIL CSV IMPORT =====
+const RCLC_CLASS_MAP = {
+  'DEATHKNIGHT':'Death Knight','DEMONHUNTER':'Demon Hunter','DRUID':'Druid',
+  'EVOKER':'Evoker','HUNTER':'Hunter','MAGE':'Mage','MONK':'Monk',
+  'PALADIN':'Paladin','PRIEST':'Priest','ROGUE':'Rogue','SHAMAN':'Shaman',
+  'WARLOCK':'Warlock','WARRIOR':'Warrior'
+};
+const RCLC_DIFF_MAP = { '14':'Normal', '15':'Heroic', '16':'Mythic' };
+
+function parseCSVLine(line) {
+  const result = []; let current = ''; let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQuotes = !inQuotes; }
+    else if (c === ',' && !inQuotes) { result.push(current); current = ''; }
+    else { current += c; }
+  }
+  result.push(current);
+  return result;
+}
+
+window.importRCLootCSV = function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    if (lines.length < 2) { toast('CSV vacio o invalido', false); return; }
+
+    const headers = parseCSVLine(lines[0]);
+    const hIdx = {};
+    headers.forEach((h, i) => hIdx[h.trim()] = i);
+
+    // Validate required columns
+    const required = ['player','date','time','item','response','class','instance','boss','difficultyID','equipLoc','subType'];
+    const missing = required.filter(r => hIdx[r] === undefined);
+    if (missing.length) { toast('Columnas faltantes: ' + missing.join(', '), false); return; }
+
+    // Filter: only BIS and Upgrade — skip Off spec, PL, Pass, Disenchant, Banking, Announced
+    const validResponses = ['BIS','Upgrade'];
+    let imported = 0, skipped = 0, dupes = 0;
+    const existingIds = new Set(window.lootHistory.map(e => e.rcId).filter(Boolean));
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i]);
+      if (cols.length < headers.length - 2) continue; // allow some tolerance
+
+      const response = (cols[hIdx['response']] || '').trim();
+      if (!validResponses.includes(response)) { skipped++; continue; }
+
+      const playerRaw = (cols[hIdx['player']] || '').trim();
+      const playerName = playerRaw.split('-')[0]; // Remove realm
+      const itemRaw = (cols[hIdx['item']] || '').trim();
+      const itemName = itemRaw.replace(/^\[/, '').replace(/\]$/, ''); // Remove brackets
+      const date = (cols[hIdx['date']] || '').trim().replace(/\//g, '-');
+      const time = (cols[hIdx['time']] || '').trim();
+      const classRaw = (cols[hIdx['class']] || '').trim();
+      const className = RCLC_CLASS_MAP[classRaw] || classRaw;
+      const diffId = (cols[hIdx['difficultyID']] || '').trim();
+      const difficulty = RCLC_DIFF_MAP[diffId] || 'Normal';
+      const instance = (cols[hIdx['instance']] || '').trim();
+      const boss = (cols[hIdx['boss']] || '').trim();
+      const slot = (cols[hIdx['equipLoc']] || '').trim() || (cols[hIdx['subType']] || '').trim();
+      const note = hIdx['note'] !== undefined ? (cols[hIdx['note']] || '').trim() : '';
+      const rcId = hIdx['id'] !== undefined ? (cols[hIdx['id']] || '').trim() : '';
+      const itemID = hIdx['itemID'] !== undefined ? (cols[hIdx['itemID']] || '').trim() : '';
+      const votes = hIdx['votes'] !== undefined ? parseInt(cols[hIdx['votes']] || '0') : 0;
+
+      // Dedup check
+      if (rcId && existingIds.has(rcId)) { dupes++; continue; }
+
+      // Armor type from subType
+      const armorType = (cols[hIdx['subType']] || '').trim();
+
+      const entry = {
+        id: Date.now() + i,
+        rcId: rcId,
+        item: itemName,
+        itemID: itemID,
+        difficulty: difficulty,
+        instance: instance.replace(/-Normal|-Heroic|-Mythic/g, ''),
+        boss: boss,
+        slot: slot,
+        armor: armorType,
+        player: playerName,
+        class: className,
+        spec: '', // RCLC doesn't export spec
+        role: '',
+        response: response,
+        votes: votes,
+        note: note,
+        date: date,
+        timestamp: new Date(date + ' ' + time).getTime() || Date.now(),
+        source: 'RCLootCouncil'
+      };
+
+      window.lootHistory.push(entry);
+      existingIds.add(rcId);
+      imported++;
+    }
+
+    window.saveLootHistory();
+    renderLootHistory();
+    event.target.value = ''; // Reset file input
+
+    let msg = '📋 RCLootCouncil: ' + imported + ' items importados';
+    if (skipped) msg += ' (' + skipped + ' PL/DE/Pass omitidos)';
+    if (dupes) msg += ' (' + dupes + ' duplicados)';
+    toast(msg, imported > 0);
+  };
+  reader.readAsText(file);
+};
+
+// ===== TOAST =====
+window.toast = function(msg, ok) {
+  const d = document.createElement('div');
+  d.className = 'toast ' + (ok ? 'toast-ok' : ok === false ? 'toast-err' : 'toast-info');
+  d.textContent = msg;
+  document.getElementById('toastBox').appendChild(d);
+  setTimeout(() => { d.style.opacity='0'; setTimeout(() => d.remove(), 600); }, 3500);
+};
+
+// ===== BiS TAB 4 FUNCTIONS =====
+window.renderClassGrid = function() {
+  const grid = document.getElementById('classGrid');
+  grid.innerHTML = '';
+  const classes = Object.keys(window.SD).sort();
+  classes.forEach(cls => {
+    const iconMap = {'Death Knight':'deathknight','Demon Hunter':'demonhunter'};
+    const iconName = iconMap[cls] || cls.toLowerCase().replace(/ /g, '_');
+    const card = document.createElement('div');
+    card.className = 'class-icon' + (window.selectedClass === cls ? ' selected' : '');
+    card.innerHTML = `
+      <img src="https://wow.zamimg.com/images/wow/icons/large/classicon_${iconName}.jpg" alt="${cls}" onerror="this.src='https://wow.zamimg.com/images/wow/icons/large/classicon_${iconName.replace(/ /g,'')}.jpg'" />
+      <div class="class-name">${cls}</div>
+    `;
+    card.addEventListener('click', () => selectClass(cls));
+    grid.appendChild(card);
+  });
+};
+
+window.selectClass = function(cls) {
+  window.selectedClass = cls;
+  window.selectedSpec = null;
+  document.querySelectorAll('.class-icon').forEach(el => el.classList.remove('selected'));
+  event.target.closest('.class-icon').classList.add('selected');
+  renderSpecGrid();
+  resetBisContent();
+};
+
+window.renderSpecGrid = function() {
+  if (!window.selectedClass) return;
+  const grid = document.getElementById('specGrid');
+  grid.innerHTML = '';
+  const specs = window.SD[window.selectedClass].specs;
+  const color = window.SD[window.selectedClass].color;
+  const lightClasses = ['#FFFFFF', '#FFF468', '#AAD372', '#00FF98'];
+  const textColor = lightClasses.includes(color) ? '#000' : '#fff';
+  specs.forEach(spec => {
+    const key = window.selectedClass + '_' + spec;
+    const hasBis = window.bisCache[key] !== undefined;
+    const btn = document.createElement('button');
+    btn.className = 'spec-btn';
+    btn.textContent = spec;
+    btn.style.backgroundColor = hasBis ? color : '#555';
+    btn.style.color = textColor;
+    btn.disabled = !hasBis;
+    if (hasBis) {
+      btn.addEventListener('click', () => {
+        window.selectedSpec = spec;
+        document.querySelectorAll('#specGrid .spec-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        window.showBiS(window.selectedClass, spec);
+      });
+    }
+    grid.appendChild(btn);
+  });
+};
+
+window.resetBisContent = function() {
+  const content = document.getElementById('bisContent');
+  content.innerHTML = '<div class="no-data">Selecciona una especialización para ver el BiS</div>';
+};
+
+window.showBiS = function(cls, spec) {
+  const key = cls + '_' + spec;
+  const bis = window.bisCache[key];
+  if (!bis) {
+    document.getElementById('bisContent').innerHTML = '<div class="no-data">BiS no disponible</div>';
+    return;
+  }
+  const color = window.SD[cls].color;
+  let html = `<div class="bis-title" style="color:${color};">${cls} ${spec} — BiS Gear</div>`;
+  html += `<table class="bis-table"><thead><tr style="background-color:${color};color:#000;"><th>Slot</th><th style="min-width:40px;"></th><th>Item</th><th>Source</th></tr></thead><tbody>`;
+  bis.gear.forEach(g => {
+    const slug = g.item.toLowerCase().replace(/'/g,'').replace(/[^a-z0-9]+/g, '-').replace(/-+$/,'');
+    const iconUrl = `https://wow.zamimg.com/images/wow/icons/small/${slug}.jpg`;
+    html += `<tr><td>${g.slot}</td><td><img src="${iconUrl}" style="width:24px;height:24px;border-radius:4px;vertical-align:middle;" onerror="this.src='https://wow.zamimg.com/images/wow/icons/small/inv_misc_questionmark.blp'" /></td><td style="color:#a335ee;font-weight:bold;">${g.item}</td><td>${g.source}</td></tr>`;
+  });
+  html += '</tbody></table>';
+
+  // Trinket Tier List section
+  const tierColors = {S:'#ff8000',A:'#a335ee',B:'#0070dd',C:'#1eff00',D:'#9d9d9d'};
+  const tierBgColors = {S:'#3d2200',A:'#2d1050',B:'#0a1e3d',C:'#0a2e0a',D:'#222'};
+  html += `<div style="margin-top:24px;"><div class="bis-title" style="color:${color};">Trinket Tier List (Raid)</div>`;
+  html += '<div class="trinket-tiers">';
+  // Find this spec's BiS trinkets
+  const specTrinkets = bis.gear.filter(g => g.slot === 'Trinket').map(g => g.item);
+  for (const [tier, trinkets] of Object.entries(window.trinketTierList)) {
+    html += `<div class="tier-row"><div class="tier-label" style="background:${tierColors[tier]};color:#000;font-size:20px;font-weight:900;">${tier}</div><div class="tier-items">`;
+    trinkets.forEach(t => {
+      const isBis = specTrinkets.includes(t.name);
+      const highlight = isBis ? 'border:2px solid '+color+';box-shadow:0 0 8px '+color+';' : 'border:2px solid #444;opacity:0.7;';
+      const slug = t.name.toLowerCase().replace(/'/g,'').replace(/[^a-z0-9]+/g, '-').replace(/-+$/,'');
+      html += `<div class="tier-trinket" style="${highlight}" title="${t.name}\n${t.source}${isBis?' ★ BiS for '+spec:''}">`;
+      html += `<img src="https://wow.zamimg.com/images/wow/icons/medium/${slug}.jpg" onerror="this.src='https://wow.zamimg.com/images/wow/icons/medium/inv_misc_questionmark.blp'" style="width:36px;height:36px;border-radius:4px;" />`;
+      html += `<span style="font-size:11px;color:${isBis?color:'#888'};font-weight:${isBis?'bold':'normal'};">${t.name}</span>`;
+      html += '</div>';
+    });
+    html += '</div></div>';
+  }
+  html += '</div></div>';
+  document.getElementById('bisContent').innerHTML = html;
+};
+
+// ===== ROSTER RENDERING =====
+function renderPlayerCard(p, grid) {
+  const cc = CLASS_COLORS[p.cN] || '#fff';
+  const selected = window.selectedPlayers.has(p.uid||p.nm);
+  const rankLabel = p.rank ? '<span style="color:#888;font-size:10px;margin-left:4px;">['+p.rank+']</span>' : '';
+  const ownerLabel = (!p.isMain && p.owner && p.owner !== p.nm) ? '<span style="color:#666;font-size:10px;"> → '+p.owner+'</span>' : '';
+  const card = document.createElement('div');
+  card.className = 'player-card' + (selected ? ' selected' : '');
+  card.innerHTML = `
+    <div class="check">${selected ? '✓' : ''}</div>
+    <div class="info">
+      <div class="pname" style="color:${cc}">${p.nm}${rankLabel}</div>
+      <div class="pdetail">${p.sN} ${p.cN} ${ROLE_ICONS[p.role]||''}${ownerLabel}</div>
+    </div>
+    <div class="pilvl">${p.il}</div>
+  `;
+  card.addEventListener('click', () => {
+    if (window.selectedPlayers.has(p.uid||p.nm)) window.selectedPlayers.delete(p.uid||p.nm);
+    else window.selectedPlayers.add(p.uid||p.nm);
+    renderRoster();
+    updateRosterStats();
+  });
+  grid.appendChild(card);
+}
+
+function renderRoster() {
+  const grid = document.getElementById('playerGrid');
+  grid.innerHTML = '';
+
+  const mains = window.roster.filter(p => p.isMain);
+  const alts = window.roster.filter(p => !p.isMain);
+
+  if (mains.length && alts.length) {
+    // Section: Mains
+    const mainsHeader = document.createElement('div');
+    mainsHeader.style.cssText = 'grid-column:1/-1;padding:8px 4px 4px;font-weight:bold;color:#ffd700;font-size:14px;border-bottom:1px solid #333;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;';
+    mainsHeader.innerHTML = '⭐ Mains <span style="color:#888;font-size:12px;font-weight:normal;">'+mains.length+' personajes</span>';
+    grid.appendChild(mainsHeader);
+    mains.sort((a,b) => b.il - a.il).forEach(p => renderPlayerCard(p, grid));
+
+    // Section: Alts
+    const altsHeader = document.createElement('div');
+    altsHeader.style.cssText = 'grid-column:1/-1;padding:12px 4px 4px;font-weight:bold;color:#a335ee;font-size:14px;border-bottom:1px solid #333;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;';
+    altsHeader.innerHTML = '🔄 Alts <span style="color:#888;font-size:12px;font-weight:normal;">'+alts.length+' personajes</span>';
+    grid.appendChild(altsHeader);
+    alts.sort((a,b) => b.il - a.il).forEach(p => renderPlayerCard(p, grid));
+  } else {
+    // No rank data — render flat sorted by ilvl
+    window.roster.sort((a,b) => b.il - a.il).forEach(p => renderPlayerCard(p, grid));
+  }
+  updateRosterStats();
+  renderTierGrid();
+}
+
+function updateRosterStats() {
+  const selected = window.roster.filter(p => window.selectedPlayers.has(p.uid||p.nm));
+  document.getElementById('statTotal').textContent = window.roster.length;
+  document.getElementById('statPresent').textContent = selected.length;
+  document.getElementById('statTanks').textContent = selected.filter(p=>p.role==='tank').length;
+  document.getElementById('statHealers').textContent = selected.filter(p=>p.role==='healer').length;
+  document.getElementById('statDPS').textContent = selected.filter(p=>p.role==='dps'||p.role==='support').length;
+  document.getElementById('statIlvl').textContent = selected.length ? Math.round(selected.reduce((s,p)=>s+p.il,0)/selected.length) : 0;
+  document.getElementById('statGear').textContent = selected.filter(p=>p.gear).length;
+}
+
+function updateS2Stats() {
+  const selected = window.roster.filter(p => window.selectedPlayers.has(p.uid||p.nm));
+  document.getElementById('s2Present').textContent = selected.length;
+  document.getElementById('s2Ilvl').textContent = selected.length ? Math.round(selected.reduce((s,p)=>s+p.il,0)/selected.length) : 0;
+  document.getElementById('s2BossNum').textContent = window.bossCount;
+}
+
+function updateS3Stats() {
+  document.getElementById('s3ItemCount').textContent = window.analyzedItems.length;
+  document.getElementById('s3BossNum').textContent = window.bossCount;
+}
+
+// ===== RAIDER.IO GEAR =====
+const RIO_SLOT_MAP = {
+  head:'head',neck:'neck',shoulder:'shoulder',back:'back',chest:'chest',
+  waist:'waist',wrist:'wrist',hands:'hands',legs:'legs',feet:'feet',
+  finger1:'finger',finger2:'finger',trinket1:'trinket',trinket2:'trinket',
+  mainhand:'mh',offhand:'oh'
+};
+
+async function fetchGear(name, realm, region) {
+  try {
+    const r = await fetch('https://raider.io/api/v1/characters/profile?region='+(region||'us')+'&realm='+encodeURIComponent(realm||'illidan')+'&name='+encodeURIComponent(name)+'&fields=gear');
+    const d = await r.json();
+    if (!d.gear || !d.gear.items) return null;
+    const gear = {};
+    for (const [slot, info] of Object.entries(d.gear.items)) {
+      const mapped = RIO_SLOT_MAP[slot];
+      if (mapped && info && info.item_level) {
+        if (gear[mapped]) gear[mapped] = Math.min(gear[mapped], info.item_level);
+        else gear[mapped] = info.item_level;
+      }
+    }
+    return gear;
+  } catch(e) { return null; }
+}
+
+// ===== LOAD FROM API =====
+const RF_BASE = (window.location.hostname.includes('github.io') || window.location.protocol === 'file:')
+  ? 'https://wowmythic-2bavpmkc.manus.space'
+  : '';
+window.loadFromAPI = async function() {
+  toast('Cargando roster desde RaidForge...', null);
+  try {
+    const url = RF_BASE + '/api/trpc/characters.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3Anull%7D%7D';
+    const r = await fetch(url);
+    const d = await r.json();
+    const chars = d[0]?.result?.data?.json || [];
+    const roster = chars.map(c => {
+      const cl = CMAP[c.className] || c.className;
+      const stats = CD[cl] ? CD[cl].stats : ['any'];
+      const spec = c.specOverride || c.spec;
+      let role = 'dps';
+      if (['Blood','Vengeance','Guardian','Brewmaster','Protection'].includes(spec)) role = 'tank';
+      else if (['Restoration','Preservation','Mistweaver','Holy','Discipline'].includes(spec)) role = 'healer';
+      else if (spec === 'Augmentation') role = 'support';
+      const rank = c.rank || '';
+      const isMain = !rank.toLowerCase().includes('alt');
+      return {
+        id:c.id, uid:String(c.id||c.name+'_'+Math.random().toString(36).slice(2,6)), nm:c.name, cl, sp:spec, cN:c.className, sN:spec,
+        arm:CD[cl]?.armor||'cloth', role, pSt:stats[0]||'int',
+        il:c.itemLevel||0, wc:c.wclHeroicAvg||0, at:90, on:true,
+        realm:c.realm||'illidan', region:c.region||'us',
+        rank, owner:c.owner||c.name, isMain
+      };
+    });
+    window.roster = roster;
+    window.selectedPlayers.clear();
+    const mainCount = roster.filter(p => p.isMain).length;
+    const altCount = roster.filter(p => !p.isMain).length;
+    if (mainCount > 0 && altCount > 0) {
+      roster.filter(p => p.isMain).forEach(p => window.selectedPlayers.add(p.uid||p.nm));
+    } else {
+      roster.forEach(p => window.selectedPlayers.add(p.uid||p.nm));
+    }
+    renderRoster();
+    toast('Roster: '+mainCount+' mains, '+altCount+' alts. Cargando gear...', true);
+
+    let gearLoaded = 0;
+    const batch = 5;
+    for (let i = 0; i < roster.length; i += batch) {
+      const slice = roster.slice(i, i+batch);
+      const results = await Promise.all(slice.map(p => fetchGear(p.nm, p.realm, p.region)));
+      results.forEach((gear, j) => { if(gear){roster[i+j].gear=gear; gearLoaded++;} });
+      updateRosterStats();
+    }
+    toast('Gear cargado: '+gearLoaded+'/'+roster.length, true);
+  } catch(e) {
+    if (window.location.hostname.includes('github.io') || window.location.protocol === 'file:') {
+      toast('⚠️ CORS bloqueado — usa "Importar JSON" con un archivo exportado desde RaidForge, o abre la app directo en manus.space', false);
+    } else {
+      toast('Error: '+e.message, false);
+    }
+  }
+};
+
+// ===== IMPORT / EXPORT ROSTER =====
+window.importRosterJSON = function(jsonData) {
+  try {
+    let chars = jsonData;
+    // Support RaidForge tRPC format
+    if (Array.isArray(jsonData) && jsonData[0]?.result?.data?.json) {
+      chars = jsonData[0].result.data.json;
+    }
+    // Support direct array of characters
+    if (!Array.isArray(chars)) chars = [chars];
+    // Detect if already in internal format (has 'nm' field)
+    if (chars[0]?.nm) {
+      // Ensure uid exists for internal format
+      window.roster = chars.map((c,i) => ({ ...c, uid: c.uid || c.id || (c.nm+'_'+i) }));
+    } else {
+      // Parse from RaidForge format
+      window.roster = chars.map(c => {
+        const cl = CMAP[c.className] || c.className;
+        const stats = CD[cl] ? CD[cl].stats : ['any'];
+        const spec = c.specOverride || c.spec;
+        let role = c.roleOverride ? c.roleOverride.toLowerCase() : 'dps';
+        if (!c.roleOverride) {
+          if (['Blood','Vengeance','Guardian','Brewmaster','Protection'].includes(spec)) role = 'tank';
+          else if (['Restoration','Preservation','Mistweaver','Holy','Discipline'].includes(spec)) role = 'healer';
+          else if (spec === 'Augmentation') role = 'support';
+        }
+        const rank = c.rank || '';
+        const isMain = !rank.toLowerCase().includes('alt');
+        return {
+          id:c.id, uid:String(c.id||c.name+'_'+Math.random().toString(36).slice(2,6)), nm:c.name, cl, sp:spec, cN:c.className, sN:spec,
+          arm:CD[cl]?.armor||'cloth', role, pSt:stats[0]||'int',
+          il:c.itemLevel||0, wc:c.wclHeroicAvg||0, at:90, on:true,
+          realm:c.realm||'illidan', region:c.region||'us',
+          rank, owner:c.owner||c.name, isMain
+        };
+      });
+    }
+    window.selectedPlayers.clear();
+    const mainCount = window.roster.filter(p => p.isMain).length;
+    const altCount = window.roster.filter(p => !p.isMain).length;
+    // Auto-select only mains if we have rank data, otherwise select all
+    if (mainCount > 0 && altCount > 0) {
+      window.roster.filter(p => p.isMain).forEach(p => window.selectedPlayers.add(p.uid||p.nm));
+    } else {
+      window.roster.forEach(p => window.selectedPlayers.add(p.uid||p.nm));
+    }
+    renderRoster();
+    toast('Roster importado: '+mainCount+' mains, '+altCount+' alts ('+window.roster.length+' total)', true);
+  } catch(e) { toast('Error al importar: '+e.message, false); }
+};
+
+window.exportRosterJSON = function() {
+  if (!window.roster.length) { toast('No hay roster para exportar', false); return; }
+  const blob = new Blob([JSON.stringify(window.roster, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ek-roster-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  toast('Roster exportado: '+window.roster.length+' personajes', true);
+};
+
+// ===== ANALYSIS ENGINE =====
+window.analyzeResolvedItem = function(itemData, difficulty, manualIlvl) {
+  const raidRoster = window.roster.filter(p => window.selectedPlayers.has(p.uid||p.nm));
+  let ilvl = manualIlvl;
+  if (!ilvl) {
+    const topIlvls = raidRoster.map(p=>p.il).sort((a,b)=>b-a).slice(0,15);
+    const topAvg = topIlvls.length ? topIlvls.reduce((s,v)=>s+v,0)/topIlvls.length : 250;
+    const diffBonus = difficulty==='Mythic'?13:difficulty==='Heroic'?6:0;
+    ilvl = Math.round(topAvg + diffBonus);
+  }
+  const slot = itemData.slot, armorType = itemData.armor, itemStat = itemData.stat;
+  let eligible = raidRoster.filter(p => {
+    if(armorType!=='any'){const ci=CD[p.cl];if(!ci||ci.armor!==armorType)return false;}
+    if(itemStat!=='any'){const ci=CD[p.cl];if(!ci||!ci.stats.includes(itemStat))return false;}
+    return true;
+  });
+  const ilvls = eligible.map(p=>p.il).sort((a,b)=>b-a);
+  const median = ilvls[Math.floor(ilvls.length/2)]||0;
+  eligible = eligible.filter(p => p.il >= median-20);
+
+  const scored = eligible.map(p => {
+    let equippedIlvl = p.il;
+    if(p.gear && slot){
+      if(slot==='finger') equippedIlvl=Math.min(p.gear['finger1']||p.gear['finger']||p.il, p.gear['finger2']||p.gear['finger']||p.il);
+      else if(slot==='trinket') equippedIlvl=Math.min(p.gear['trinket1']||p.gear['trinket']||p.il, p.gear['trinket2']||p.gear['trinket']||p.il);
+      else equippedIlvl = p.gear[slot]||p.il;
+    }
+    const gap = ilvl - equippedIlvl;
+    // === 3 FACTOR SCORING: Droptimizer + WCL + Attendance ===
+    const dropScore = window.getDroptimizerScore(p.nm, itemData.name);
+    const wclScore = Math.min(1,(p.wc||0)/100);
+    const attScore = Math.min(1,(p.at||90)/100);
+    const w = window.algoWeights;
+    const wSum = w.drop + w.wcl + w.att;
+    const n = wSum > 0 ? wSum / 100 : 1;
+    const total = gap>0 ? (dropScore*(w.drop/100/n))+(wclScore*(w.wcl/100/n))+(attScore*(w.att/100/n)) : 0;
+    return {name:p.nm, class:p.cN, spec:p.sN, role:p.role, total, wclScore, attScore, dropScore, equippedIlvl, ilvlGap:gap};
+  });
+
+  const upgrades = scored.filter(s=>s.ilvlGap>0).sort((a,b)=>b.total-a.total);
+  const top = upgrades.slice(0,5);
+  return {item:itemData.name, difficulty, ilvl, boss:itemData.boss, slot:SL[slot]||slot, armor:AL[armorType]||armorType, stat:itemStat, eligible:eligible.length, upgradeCount:upgrades.length, top};
+};
+
+// ===== BiS TOOLTIP BUILDER =====
+window.buildBisTooltip = function(className, specName, resultSlot) {
+  const bisKey = className + '_' + specName;
+  const bisData = window.bisCache[bisKey];
+  if (!bisData) return '';
+
+  // Map result slot labels back to bisCache slot names
+  const slotMap = {'Head':'Head','Neck':'Neck','Shoulder':'Shoulders','Back/Cloak':'Cloak','Chest':'Chest','Wrist':'Wrist','Hands':'Gloves','Waist':'Belt','Legs':'Legs','Feet':'Boots','Ring':'Ring','Trinket':'Trinket','Main Hand':'Weapon','Off Hand':'Off Hand'};
+  const bisSlotName = slotMap[resultSlot] || resultSlot;
+  const isTrinket = resultSlot === 'Trinket';
+
+  if (isTrinket) {
+    // Build trinket tier list tooltip
+    const bisTrinkets = bisData.gear.filter(g => g.slot === 'Trinket').map(g => g.item.toLowerCase());
+    const tierColors = {S:'#ff7777',A:'#ffaa44',B:'#ffd700',C:'#88cc88',D:'#8888aa'};
+    let html = '<div class="bis-tooltip trinket-tip"><div class="tip-title">🎯 Trinket Tier List — ' + specName + ' ' + className + '</div>';
+    for (const [tier, trinkets] of Object.entries(window.trinketTierList)) {
+      html += '<div class="mini-tier-row"><span class="mini-tier-label" style="background:' + tierColors[tier] + ';color:#000;">' + tier + '</span><span class="mini-tier-items">';
+      html += trinkets.map(t => {
+        const isBis = bisTrinkets.includes(t.name.toLowerCase());
+        return isBis ? '<span class="bis-match">★ ' + t.name + '</span>' : t.name;
+      }).join(', ');
+      html += '</span></div>';
+    }
+    html += '</div>';
+    return html;
+  } else {
+    // Find BiS item for this slot
+    const bisItems = bisData.gear.filter(g => g.slot === bisSlotName);
+    if (!bisItems.length) return '';
+    let html = '<div class="bis-tooltip"><div class="tip-title">🎯 BiS ' + resultSlot + ' — ' + specName + ' ' + className + '</div>';
+    bisItems.forEach(b => {
+      html += '<div><span class="tip-item">' + b.item + '</span> <span class="tip-source">(' + b.source + ')</span></div>';
+    });
+    html += '</div>';
+    return html;
+  }
+};
+
+// ===== DISPLAY RESULTS =====
+window.displayAnalysis = function(result) {
+  const panel = document.getElementById('resultsPanel');
+  window.analyzedItems.push(result);
+
+  // Summary card in Tab 2
+  const itemsList = document.getElementById('itemsList');
+  if (window.analyzedItems.length === 1) itemsList.innerHTML = '';
+  const itemCard = document.createElement('div');
+  itemCard.className = 'item-pending';
+  const topName = result.top.length > 0 ? result.top[0].name : 'N/A';
+  itemCard.innerHTML = '<div><span style="color:#a335ee;font-weight:bold;">'+result.item+'</span> <span style="color:#ffd700;font-size:12px;">['+result.difficulty+']</span> <span style="color:#888;font-size:12px;">'+result.slot+' • '+result.armor+'</span></div><div style="font-size:12px;color:#2ecc40;">🏆 '+topName+'</div>';
+  itemsList.appendChild(itemCard);
+
+  // Full result card for Tab 3
+  let html = '<div class="result-card"><div class="result-header"><div><span class="result-item-name">'+result.item+'</span><span class="result-diff">['+result.difficulty+']</span></div><span class="result-ilvl">ilvl '+result.ilvl+'</span></div>';
+  html += '<div class="result-meta"><span>📍 '+result.slot+'</span><span>🛡️ '+result.armor+'</span><span>📊 '+result.stat+'</span>';
+  if(result.boss) html += '<span>👹 '+result.boss+'</span>';
+  html += '<span>👥 '+result.eligible+' elegibles</span></div>';
+
+  if(result.top.length===0){
+    html += '<div style="color:#ff8844;padding:12px;text-align:center;">No es upgrade para nadie en el raid.</div>';
+  } else {
+    html += '<div class="section-label">🏆 Top Candidatos</div>';
+    result.top.forEach((p,i) => {
+      const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
+      const cc = CLASS_COLORS[p.class]||'#fff';
+      const gapColor = p.ilvlGap>10?'#00ff88':p.ilvlGap>3?'#ffdd44':p.ilvlGap>0?'#ff8844':'#ff4444';
+      const gapText = p.ilvlGap>0?'+'+p.ilvlGap+' upgrade':'sidegrade';
+      const bisTooltip = window.buildBisTooltip(p.class, p.spec, result.slot);
+      // Check if this item is BiS for this candidate
+      let isBisItem = false;
+      const bisKey = p.class + '_' + p.spec;
+      const bisData = window.bisCache[bisKey];
+      if (bisData) {
+        const itemLower = result.item.toLowerCase();
+        isBisItem = bisData.gear.some(g => g.item.toLowerCase() === itemLower);
+      }
+      const bisTag = isBisItem ? '<span style="background:#ffd700;color:#000;font-size:10px;font-weight:bold;padding:1px 6px;border-radius:4px;margin-left:6px;">BiS</span>' : '';
+      const lootCnt = window.getLootCount(p.name);
+      const lootTag = lootCnt > 0 ? '<span style="background:#555;color:#ffd700;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:4px;" title="Items recibidos">🎁'+lootCnt+'</span>' : '';
+      // Droptimizer tag
+      const dropGain = window.droptimizerData[p.name] ? Object.values(window.droptimizerData[p.name]).find(d => d.item.toLowerCase() === result.item.toLowerCase()) : null;
+      const dropTag = dropGain ? '<span style="background:#ff8844;color:#000;font-size:10px;font-weight:bold;padding:1px 6px;border-radius:4px;margin-left:4px;" title="Droptimizer: +'+dropGain.gain.toLocaleString()+' DPS">📈+'+dropGain.gain.toLocaleString()+'</span>' : (p.dropScore > 0 ? '<span style="background:#664422;color:#ffaa66;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:4px;" title="Droptimizer score: '+(p.dropScore*100).toFixed(0)+'%">📈</span>' : '');
+      // Tier badge
+      const tierTag = window.getTierBadgeHTML(p.name, result.slot);
+      const assignId = 'assign_'+Date.now()+'_'+i;
+      html += '<div class="candidate-row"><div class="candidate-left"><span style="font-size:18px;width:28px;text-align:center;">'+medal+'</span><div><span style="color:'+cc+';font-weight:bold;">'+p.name+'</span>'+bisTag+lootTag+dropTag+tierTag+' <span style="color:#888;font-size:12px;">'+p.spec+' '+p.class+' '+(ROLE_ICONS[p.role]||'')+'</span></div></div>';
+      html += '<div class="candidate-right"><div style="text-align:center;"><div style="color:'+gapColor+';font-weight:bold;">'+gapText+'</div><div style="color:#666;font-size:11px;">'+p.equippedIlvl+' → '+result.ilvl+'</div></div>';
+      html += '<div style="text-align:center;"><div style="color:#ff8844;">'+(p.dropScore*100).toFixed(0)+'</div><div style="color:#666;font-size:11px;">Sim</div></div>';
+      html += '<div style="text-align:center;"><div style="color:#88f;">'+(p.wclScore*100).toFixed(0)+'</div><div style="color:#666;font-size:11px;">WCL</div></div>';
+      html += '<div style="text-align:center;"><div style="color:#aaf;">'+(p.attScore*100).toFixed(0)+'</div><div style="color:#666;font-size:11px;">Att</div></div>';
+      html += '<button class="btn-assign" onclick="window.assignLoot(\''+result.item.replace(/'/g,"\\'")+'\',\''+result.difficulty+'\','+result.ilvl+',\''+result.slot+'\',\''+result.armor+'\',\''+p.name.replace(/'/g,"\\'")+'\',\''+p.class+'\',\''+p.spec+'\',\''+p.role+'\');this.outerHTML=\'<span class=assigned-badge>Asignado ✓</span>\';">Asignar</button>';
+      html += '<div class="score-badge">'+(p.total*100).toFixed(0)+'</div></div>'+bisTooltip+'</div>';
+    });
+  }
+  html += '</div>';
+
+  // Prepend latest result
+  const placeholder = panel.querySelector('[style*="text-align:center"]');
+  if (placeholder && placeholder.textContent.includes('Analiza items')) panel.innerHTML = '';
+  panel.innerHTML = html + panel.innerHTML;
+  updateS3Stats();
+};
+
+// ===== INIT WEIGHTS & DROPTIMIZER =====
+window.initWeightSliders();
+renderDroptimizerEntries();
+renderTierGrid();
+
+// ===== EVENT LISTENERS =====
+document.getElementById('btnLoadRoster').addEventListener('click', window.loadFromAPI);
+
+document.getElementById('btnImportJSON').addEventListener('click', () => {
+  document.getElementById('jsonFileInput').click();
+});
+document.getElementById('jsonFileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try { window.importRosterJSON(JSON.parse(ev.target.result)); }
+    catch(err) { toast('JSON inválido: '+err.message, false); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+document.getElementById('btnExportJSON').addEventListener('click', window.exportRosterJSON);
+
+document.getElementById('btnSelectAll').addEventListener('click', () => {
+  window.roster.forEach(p => window.selectedPlayers.add(p.uid||p.nm));
+  renderRoster();
+});
+
+document.getElementById('btnSelectMains').addEventListener('click', () => {
+  window.selectedPlayers.clear();
+  window.roster.filter(p => p.isMain).forEach(p => window.selectedPlayers.add(p.uid||p.nm));
+  renderRoster();
+  const cnt = window.roster.filter(p => p.isMain).length;
+  toast('⭐ ' + cnt + ' mains seleccionados', true);
+});
+
+document.getElementById('btnDeselectAll').addEventListener('click', () => {
+  window.selectedPlayers.clear();
+  renderRoster();
+});
+
+// ===== ITEM RESOLVER ENGINE =====
+window.resolveItem = function(itemName) {
+  const n = itemName.toLowerCase().trim();
+  // Slot detection by keywords
+  const slotRules = [
+    {slot:'head', kw:['crown','helm','hood','mask','cowl','headpiece','headband','faceguard','greathelm','visage','coif','cap','circlet','headguard','intake']},
+    {slot:'neck', kw:['necklace','pendant','amulet','chain','choker','collar','locket','medallion','torque','lei']},
+    {slot:'shoulder', kw:['shoulder','pauldron','mantle','spaulder','epaulet','shoulderguard','shoulderplate','exhaustplate','seedpod']},
+    {slot:'back', kw:['cloak','cape','drape','shroud','shawl','wrap','nullcape']},
+    {slot:'chest', kw:['robe','chest','tunic','vest','cuirass','hauberk','breastplate','chestpiece','chestguard','jerkin','harness','engine','trunk','vestment']},
+    {slot:'wrist', kw:['bracer','wristband','wristguard','wrist','cuff','armband','deflector','wristlet','wristwrap']},
+    {slot:'hands', kw:['glove','gauntlet','handwrap','grip','handguard','fist','mitt']},
+    {slot:'waist', kw:['belt','sash','waistband','cord','girdle','cinch','waistguard','waistchain','cincture']},
+    {slot:'legs', kw:['legs','legging','legguard','kilt','pant','legwrap','breeches','greave','cuisses','phloemwrap','piston','trousers']},
+    {slot:'feet', kw:['boot','shoe','sandal','slipper','treads','footwrap','footguard','sabatons','espadrille','stomper']},
+    {slot:'finger', kw:['ring','band','signet','loop','seal','circlet of','bifurcation','omission','occlusion','eye of']},
+    {slot:'trinket', kw:['trinket','idol','relic','charm','insignia','emblem','talisman','puzzle box','guidon','plume','stare','candle','effigy','voidglobe','hourglass','compendium','codex']},
+    {slot:'main_hand', kw:['sword','axe','mace','dagger','staff','glaive','warglaive','polearm','hammer','blade','spire','scythe','scepter','judgement','lament','reach','fist weapon','talon']},
+    {slot:'off_hand', kw:['off hand','offhand','shield','buckler','tome','orb','lantern','focus','bulwark','aegis','sunblade','sunglaive']},
+  ];
+  let detectedSlot = 'any';
+  for (const rule of slotRules) {
+    if (rule.kw.some(kw => n.includes(kw))) { detectedSlot = rule.slot; break; }
+  }
+  // Armor type detection by keywords
+  let detectedArmor = 'any';
+  const clothKw = ['robe','cowl','cord','sash','slippers','sandals','handwrap','vestment','mantle of','hood of'];
+  const leatherKw = ['jerkin','vest of','leather','hide','pelt','shadowmask','esprit','espadrille'];
+  const mailKw = ['hauberk','coif','chain','mail','scale','links'];
+  const plateKw = ['plate','sabatons','gauntlet','breastplate','pauldron','greathelm','cuirass','greave','vambrace','faceguard'];
+  if (clothKw.some(kw => n.includes(kw))) detectedArmor = 'cloth';
+  else if (leatherKw.some(kw => n.includes(kw))) detectedArmor = 'leather';
+  else if (mailKw.some(kw => n.includes(kw))) detectedArmor = 'mail';
+  else if (plateKw.some(kw => n.includes(kw))) detectedArmor = 'plate';
+  // Accessories are armor-agnostic
+  if (['neck','finger','trinket','back'].includes(detectedSlot)) detectedArmor = 'any';
+  // Stat detection
+  let detectedStat = 'any';
+  const intKw = ['spell','magic','arcane','void','shadow','lunar','astral','twilight','cosmic','fel','nether','radiant','locus','aln'];
+  const agiKw = ['fang','claw','swift','venom','agile','serpent','razor','wind','storm','stab','snipe'];
+  const strKw = ['might','war','fury','titan','iron','steel','crusade','valor','heavy','smash'];
+  if (intKw.some(kw => n.includes(kw))) detectedStat = 'int';
+  else if (agiKw.some(kw => n.includes(kw))) detectedStat = 'agi';
+  else if (strKw.some(kw => n.includes(kw))) detectedStat = 'str';
+  return { name: itemName, slot: detectedSlot, armor: detectedArmor, stat: detectedStat, boss: null };
+};
+
+// ===== WOWHEAD TOOLTIP FETCH (by item ID) =====
+window.fetchWowheadTooltip = async function(itemId) {
+  const tipUrl = 'https://nether.wowhead.com/tooltip/item/' + itemId + '?dataEnv=1&locale=0';
+  const tipRes = await fetch(tipUrl);
+  if (!tipRes.ok) throw new Error('Tooltip HTTP ' + tipRes.status);
+  const tipData = await tipRes.json();
+  const tip = tipData.tooltip || '';
+
+  // Parse slot and armor from tooltip HTML
+  const parser = new DOMParser();
+  const doc = parser.parseFromString('<div>' + tip + '</div>', 'text/html');
+  let slot = 'unknown', armor = 'any';
+
+  const slotLookup = {
+    'Head':'head','Neck':'neck','Shoulder':'shoulder','Back':'back',
+    'Chest':'chest','Robe':'chest','Wrist':'wrist','Hands':'hands',
+    'Waist':'waist','Legs':'legs','Feet':'feet','Finger':'finger',
+    'Trinket':'trinket','Main Hand':'main_hand','One-Hand':'main_hand',
+    'Two-Hand':'main_hand','Off Hand':'off_hand','Held In Off-hand':'off_hand',
+    'Ranged':'main_hand'
+  };
+  const armorLookup = {'Plate':'plate','Mail':'mail','Leather':'leather','Cloth':'cloth'};
+
+  for (const td of doc.querySelectorAll('td')) {
+    const txt = td.textContent.trim();
+    if (slotLookup[txt]) { slot = slotLookup[txt]; break; }
+  }
+  for (const th of doc.querySelectorAll('th')) {
+    const txt = th.textContent.trim();
+    if (armorLookup[txt]) { armor = armorLookup[txt]; break; }
+  }
+  if (['neck','finger','trinket','back'].includes(slot)) armor = 'any';
+
+  // Parse primary stat
+  let stat = 'any';
+  if (/Agility or|or Agility|Strength or Intellect/i.test(tip)) stat = 'any';
+  else if (/Intellect/i.test(tip)) stat = 'int';
+  else if (/Agility/i.test(tip)) stat = 'agi';
+  else if (/Strength/i.test(tip)) stat = 'str';
+
+  // Parse item level
+  let ilvl = null;
+  const ilvlMatch = tip.match(/Item Level\s*(?:<!--[^>]*-->)*\s*(\d+)/);
+  if (ilvlMatch) ilvl = parseInt(ilvlMatch[1]);
+
+  return {
+    name: tipData.name || ('Item #'+itemId), id: itemId,
+    slot, armor, stat, ilvl, boss: null,
+    icon: tipData.icon || '', quality: tipData.quality || 4
+  };
+};
+
+// ===== SMART ITEM RESOLVER =====
+// Supports: item name (BiS DB → keyword fallback), Wowhead URL, or Wowhead item ID
+window.resolveItemSmart = async function(input) {
+  const trimmed = input.trim();
+
+  // 1) Wowhead URL: https://www.wowhead.com/item=123456/slug
+  const urlMatch = trimmed.match(/wowhead\.com\/item=(\d+)/i);
+  if (urlMatch) {
+    try {
+      const data = await window.fetchWowheadTooltip(urlMatch[1]);
+      return { data, source: 'Wowhead' };
+    } catch(e) {
+      return { data: null, source: 'error', error: 'No se pudo obtener datos de Wowhead: ' + e.message };
+    }
+  }
+
+  // 2) Plain item ID (numeric)
+  if (/^\d{4,}$/.test(trimmed)) {
+    try {
+      const data = await window.fetchWowheadTooltip(trimmed);
+      return { data, source: 'Wowhead' };
+    } catch(e) {
+      return { data: null, source: 'error', error: 'Item ID no encontrado en Wowhead: ' + e.message };
+    }
+  }
+
+  // 3) Item name → check local BiS database first
+  const key = trimmed.toLowerCase();
+  if (window.itemDB[key]) {
+    const db = window.itemDB[key];
+    return { data: { name:db.name, slot:db.slot, armor:db.armor, stat:db.stat, boss:db.boss, ilvl:null }, source: 'BiS DB' };
+  }
+
+  // 4) Fuzzy match: check if input is a partial match in BiS DB
+  const fuzzyMatches = Object.keys(window.itemDB).filter(k => k.includes(key) || key.includes(k));
+  if (fuzzyMatches.length === 1) {
+    const db = window.itemDB[fuzzyMatches[0]];
+    return { data: { name:db.name, slot:db.slot, armor:db.armor, stat:db.stat, boss:db.boss, ilvl:null }, source: 'BiS DB' };
+  }
+
+  // 5) Fallback: keyword resolver
+  const resolved = window.resolveItem(trimmed);
+  if (resolved.slot !== 'any' || resolved.armor !== 'any') {
+    return { data: resolved, source: 'Keywords' };
+  }
+
+  // 6) Nothing found
+  return { data: resolved, source: 'unknown' };
+};
+
+document.getElementById('btnAnalyze').addEventListener('click', async () => {
+  const input = document.getElementById('itemNameInput').value.trim();
+  const diff = document.getElementById('diffSelect').value;
+  const ilvlOvr = document.getElementById('ilvlOverride').value;
+  if(!input){toast('Escribe el nombre del item o pega una URL de Wowhead',false);return;}
+  if(!window.roster.length){toast('Carga el roster primero (Tab 1)',false);return;}
+
+  const btn = document.getElementById('btnAnalyze');
+  btn.disabled = true;
+  btn.textContent = '⏳ Buscando...';
+  document.getElementById('itemNameInput').value = '';
+
+  const isWowhead = /wowhead\.com|^\d{4,}$/.test(input.trim());
+  toast(isWowhead ? '🔍 Consultando Wowhead...' : '🔍 Buscando: ' + input + '...', null);
+
+  const { data: itemData, source, error } = await window.resolveItemSmart(input);
+  btn.disabled = false;
+  btn.textContent = '🔍 Analizar';
+
+  if (!itemData || (itemData.slot === 'any' && itemData.armor === 'any')) {
+    toast('❌ Item no reconocido. Pega la URL de Wowhead (ej: https://www.wowhead.com/item=232850)', false);
+    return;
+  }
+  if (error) { toast('❌ ' + error, false); return; }
+
+  const ilvl = ilvlOvr ? parseInt(ilvlOvr) : (itemData.ilvl || null);
+  const result = window.analyzeResolvedItem(itemData, diff, ilvl);
+  window.displayAnalysis(result);
+
+  const slotLabel = result.slot || 'unknown';
+  const armorLabel = result.armor || 'any';
+  toast('✅ [' + source + '] ' + (itemData.name||input) + ' → ' + slotLabel + ' (' + armorLabel + ') — ' + result.upgradeCount + ' upgrades', true);
+});
+
+document.getElementById('itemNameInput').addEventListener('keydown', e => {
+  if(e.key==='Enter') document.getElementById('btnAnalyze').click();
+});
+
+document.getElementById('btnNewBoss').addEventListener('click', () => {
+  window.analyzedItems = [];
+  document.getElementById('itemsList').innerHTML = '<div style="color:#666;text-align:center;padding:20px;">Los items analizados aparecerán aquí</div>';
+  document.getElementById('resultsPanel').innerHTML = '<div style="color:#666;text-align:center;padding:40px;">Analiza items en la pestaña "Boss & Loot" para ver resultados aquí</div>';
+  window.bossCount++;
+  document.getElementById('s2BossNum').textContent = window.bossCount;
+  toast('Nuevo boss #'+window.bossCount+' — listo!', true);
+});
+
+// ===== LOOT HISTORY EVENT LISTENERS =====
+document.getElementById('btnExportLoot').addEventListener('click', () => {
+  if (!window.lootHistory.length) { toast('No hay loot para exportar', false); return; }
+  const blob = new Blob([JSON.stringify(window.lootHistory, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ek-loot-history.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Loot history exportado', true);
+});
+
+document.getElementById('btnImportLoot').addEventListener('click', () => {
+  document.getElementById('lootFileInput').click();
+});
+document.getElementById('lootFileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if (!Array.isArray(imported)) throw new Error('Formato inválido');
+      window.lootHistory = imported;
+      window.saveLootHistory();
+      renderLootHistory();
+      toast('Loot history importado: ' + imported.length + ' entries', true);
+    } catch(err) { toast('Error al importar: ' + err.message, false); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+document.getElementById('btnClearLoot').addEventListener('click', () => {
+  if (!window.lootHistory.length) { toast('No hay loot para limpiar', false); return; }
+  if (confirm('¿Seguro que quieres borrar todo el historial de loot? Esta acción no se puede deshacer.')) {
+    window.lootHistory = [];
+    window.saveLootHistory();
+    renderLootHistory();
+    toast('Historial de loot limpiado', true);
+  }
+});
+
+// Auto-load on manus.space
+if(window.location.hostname.includes('manus.space')) setTimeout(window.loadFromAPI, 500);
+</script>
+</body>
+</html>
