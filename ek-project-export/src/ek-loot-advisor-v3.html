@@ -1402,10 +1402,10 @@ async function fetchBlizzardCharacter(token, name, realm) {
 
 // ===== BLIZZARD RANK NAME MAP =====
 const BLIZZARD_RANK_NAMES = {
-  0: 'CEO', 1: 'Vicepresidente', 2: 'Raider', 3: 'Director',
-  4: 'Alt', 5: 'Alt', 6: 'Alt', 7: 'Social'
+  0: 'CEO', 1: 'Vice Presidente', 2: 'Director', 3: 'Raider',
+  4: 'Becario', 5: 'Alts', 6: 'Alts Casuales', 7: 'Casuales', 8: 'Amigos'
 };
-const MAIN_RANKS = ['CEO', 'Vicepresidente', 'Raider'];
+const MAIN_RANKS = ['CEO', 'Vice Presidente', 'Director', 'Raider', 'Becario'];
 
 function updateSyncButton(timestamp) {
   const btn = document.getElementById('btnLoadRoster');
