@@ -958,7 +958,10 @@ window.getLootFairnessScore = function(playerName) {
 };
 
 function renderLootHistory() {
-  const filtered = window.lootHistory.filter(e => e.response === 'BIS' || e.response === 'Upgrade' || !e.source);
+  const mainNames = new Set((window.roster || []).filter(p => p.isMain).map(p => p.nm));
+  const filtered = window.lootHistory
+    .filter(e => e.response === 'BIS' || e.response === 'Upgrade' || !e.source)
+    .filter(e => mainNames.has(e.player));
   const counts = {};
   filtered.forEach(e => {
     if (!counts[e.player]) counts[e.player] = { count:0, class:e.class, bis:0, upg:0 };

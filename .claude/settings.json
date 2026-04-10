@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ':*)",
+      "Bash(curl -sv -X POST \"https://us.battle.net/oauth/token\" -u \"a9bac31a3ba249c9a0d0850c6fa34ed8:tGYtfPGFQ9BV56kYa1BrqK7MOowi28Vh\" -d \"grant_type=client_credentials\")"
+    ]
+  }
+}
