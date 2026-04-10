@@ -957,10 +957,30 @@ window.getLootFairnessScore = function(playerName) {
   return 1.0 - (playerCount / max);
 };
 
+// ===== ROSTER OVERRIDES (loot history) =====
+// Aliases: maps loot history names to current main name (for renames)
+const LOOT_PLAYER_ALIASES = {
+  'Garompinax': 'Yázhi',
+  'Noah': 'Noahdp',
+  'Nôåh': 'Noahdp',
+  'Nöåh': 'Noahdp',
+  'Nðah': 'Noahdp'
+};
+// Force as ALT (override guild rank — won't appear in loot history mains)
+const LOOT_FORCE_ALT = new Set(['Lobotails']);
+// Force as MAIN (override guild rank — will appear even if not in roster mains)
+const LOOT_FORCE_MAIN = new Set(['Noahdp']);
+
 function renderLootHistory() {
-  const mainNames = new Set((window.roster || []).filter(p => p.isMain).map(p => p.nm));
+  const rosterMains = (window.roster || [])
+    .filter(p => p.isMain && !LOOT_FORCE_ALT.has(p.nm))
+    .map(p => p.nm);
+  const mainNames = new Set([...rosterMains, ...LOOT_FORCE_MAIN]);
+  const resolvePlayer = (name) => LOOT_PLAYER_ALIASES[name] || name;
+
   const filtered = window.lootHistory
     .filter(e => e.response === 'BIS' || e.response === 'Upgrade' || !e.source)
+    .map(e => ({ ...e, player: resolvePlayer(e.player) }))
     .filter(e => mainNames.has(e.player));
   const counts = {};
   filtered.forEach(e => {
