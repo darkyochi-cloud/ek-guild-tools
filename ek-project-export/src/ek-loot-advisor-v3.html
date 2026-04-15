@@ -978,10 +978,11 @@ function renderLootHistory() {
   const mainNames = new Set([...rosterMains, ...LOOT_FORCE_MAIN]);
   const resolvePlayer = (name) => LOOT_PLAYER_ALIASES[name] || name;
 
+  const hasRoster = rosterMains.length > 0;
   const filtered = window.lootHistory
     .filter(e => e.response === 'BIS' || e.response === 'Upgrade' || !e.source)
     .map(e => ({ ...e, player: resolvePlayer(e.player) }))
-    .filter(e => mainNames.has(e.player));
+    .filter(e => !hasRoster || mainNames.has(e.player));
   const counts = {};
   filtered.forEach(e => {
     if (!counts[e.player]) counts[e.player] = { count:0, class:e.class, bis:0, upg:0 };
