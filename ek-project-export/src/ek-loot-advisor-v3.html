@@ -1170,13 +1170,15 @@ window.showPlayerGear = function(playerName) {
   if (!items.length) {
     html = '<div style="color:#666;text-align:center;padding:20px;">No hay loot registrado para este jugador.</div>';
   } else {
-    const byDate = {};
+    const byGroup = {};
     items.forEach(e => {
       const d = e.date || 'Sin fecha';
-      if (!byDate[d]) byDate[d] = [];
-      byDate[d].push(e);
+      const key = d + '||' + (e.instance || '') + '||' + (e.difficulty || '');
+      if (!byGroup[key]) byGroup[key] = [];
+      byGroup[key].push(e);
     });
-    Object.entries(byDate).sort((a,b) => b[0].localeCompare(a[0])).forEach(([date, entries]) => {
+    Object.entries(byGroup).sort((a,b) => b[0].localeCompare(a[0])).forEach(([key, entries]) => {
+      const [date] = key.split('||');
       html += '<div style="color:#888;font-size:11px;margin:10px 0 4px;border-bottom:1px solid #333;padding-bottom:2px;">' + date + ' — ' + entries[0].instance + ' ' + entries[0].difficulty + '</div>';
       entries.forEach(e => {
         const respCls = e.response === 'BIS' ? 'gear-resp-bis' : 'gear-resp-upg';
@@ -1185,6 +1187,7 @@ window.showPlayerGear = function(playerName) {
         html += '<span class="gear-item-name">' + e.item + '</span>';
         html += '<div class="gear-item-meta">';
         if (e.slot) html += e.slot;
+        if (e.difficulty) html += ' · ' + e.difficulty;
         if (e.boss) html += ' · ' + e.boss;
         if (e.note) html += '<br><span style="color:#a335ee;font-style:italic;">"' + e.note + '"</span>';
         html += '</div></div>';
