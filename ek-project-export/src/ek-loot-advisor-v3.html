@@ -195,6 +195,29 @@ body { background:#0f0f23; color:#e0e0e0; font-family:'Segoe UI',sans-serif; }
 .tier-slot-label { font-size:9px; color:#666; text-align:center; }
 .tier-count { font-weight:bold; margin-left:auto; padding:2px 8px; border-radius:4px; font-size:12px; }
 
+/* Boss Priority */
+.boss-priority-table { width:100%; border-collapse:collapse; font-size:12px; }
+.boss-priority-table th { padding:8px 6px; text-align:center; background:#1a1a3e; color:#ffd700; border-bottom:2px solid #a335ee; position:sticky; top:0; z-index:2; }
+.boss-priority-table th:first-child { text-align:left; min-width:180px; }
+.boss-priority-table td { padding:6px; text-align:center; border-bottom:1px solid #222; }
+.boss-priority-table tr:hover { background:#1a1a3e; }
+.boss-priority-table .bp-boss-cell { text-align:left; font-weight:bold; white-space:nowrap; }
+.boss-priority-table .bp-raid-label { color:#888; font-size:10px; font-weight:normal; }
+.bp-cell { border-radius:4px; padding:3px 6px; font-weight:bold; font-size:11px; }
+.bp-cell-high { background:#1e3a1e; color:#2ecc40; }
+.bp-cell-med { background:#3a3a1e; color:#ffd700; }
+.bp-cell-low { background:#2a2222; color:#888; }
+.bp-cell-none { color:#333; }
+.bp-summary-card { background:#16213e; border:1px solid #333; border-radius:10px; padding:14px 16px; display:flex; align-items:center; gap:12px; }
+.bp-summary-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; margin-bottom:16px; }
+.bp-boss-rank { font-size:22px; font-weight:bold; color:#ffd700; min-width:30px; }
+.bp-boss-info { flex:1; }
+.bp-boss-name { font-weight:bold; font-size:14px; }
+.bp-boss-raid { color:#888; font-size:11px; }
+.bp-boss-value { text-align:right; }
+.bp-boss-total { color:#2ecc40; font-size:16px; font-weight:bold; }
+.bp-boss-players { color:#888; font-size:11px; }
+
 /* Toast */
 .toast { position:fixed; top:20px; right:20px; padding:12px 20px; border-radius:8px; color:#fff; font-size:14px; z-index:9999; transition:opacity 0.6s; }
 .toast-ok { background:#2ecc40; }
@@ -226,6 +249,7 @@ body { background:#0f0f23; color:#e0e0e0; font-family:'Segoe UI',sans-serif; }
   <button id="n3" onclick="showStep(3)">3. Resultados</button>
   <button id="n4" onclick="showStep(4)">4. BiS por Clase</button>
   <button id="n5" onclick="showStep(5)">5. Loot History</button>
+  <button id="n6" onclick="showStep(6)">6. Boss Priority</button>
 </div>
 
 <!-- ========== STEP 1: ROSTER ========== -->
@@ -392,6 +416,24 @@ body { background:#0f0f23; color:#e0e0e0; font-family:'Segoe UI',sans-serif; }
   <div id="lootTable"></div>
 </div>
 
+<!-- ========== STEP 6: BOSS PRIORITY ========== -->
+<div id="s6" class="step">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div style="color:#ffd700;font-size:16px;font-weight:bold;">Boss Priority — Droptimizer por Boss</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <select id="bossRaidFilter" onchange="renderBossPriority()" style="background:#0d1b2a;border:1px solid #444;color:#ffd700;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;">
+        <option value="all">Todos los Raids</option>
+        <option value="The Voidspire">The Voidspire</option>
+        <option value="The Dreamrift">The Dreamrift</option>
+        <option value="March on Quel'Danas">March on Quel'Danas</option>
+      </select>
+      <button class="btn btn-sm btn-purple" onclick="renderBossPriority()">🔄 Refrescar</button>
+    </div>
+  </div>
+  <div id="bossRosterSummary" style="margin-bottom:16px;"></div>
+  <div id="bossPriorityGrid"></div>
+</div>
+
 <script>
 // ===== SPEC DATA =====
 window.SD = {
@@ -409,6 +451,78 @@ window.SD = {
   'Warlock': {specs:['Affliction','Demonology','Destruction'], color:'#8788EE'},
   'Warrior': {specs:['Arms','Fury','Protection'], color:'#C69B6D'}
 };
+
+// ===== ENCOUNTER MAP (Encounter ID → Boss Name) =====
+const ENCOUNTER_MAP = {
+  '3176': { boss: 'Imperator Averzian', raid: 'The Voidspire' },
+  '3177': { boss: 'Vorasius', raid: 'The Voidspire' },
+  '3178': { boss: 'Vaelgor & Ezzorak', raid: 'The Voidspire' },
+  '3179': { boss: 'Fallen-King Salhadaar', raid: 'The Voidspire' },
+  '3180': { boss: 'Lightblinded Vanguard', raid: 'The Voidspire' },
+  '3181': { boss: 'Crown of the Cosmos', raid: 'The Voidspire' },
+  '3306': { boss: 'Chimaerus the Undreamt God', raid: 'The Dreamrift' },
+  '3182': { boss: "Belo'ren, Child of Al'ar", raid: "March on Quel'Danas" },
+  '3183': { boss: 'Midnight Falls', raid: "March on Quel'Danas" }
+};
+
+// Fallback: item name → boss (for EK-DROP codes without boss info)
+const ITEM_BOSS_FALLBACK = {};
+// Build from BiS data below after bisRawData is defined
+// Map short boss names (from BiS data) to full ENCOUNTER_MAP names
+const BOSS_ALIAS = {
+  'chimaerus': 'Chimaerus the Undreamt God',
+  "belo'ren": "Belo'ren, Child of Al'ar",
+  'midnight falls': 'Midnight Falls',
+  'vaelgor': 'Vaelgor & Ezzorak',
+  "l'ura": 'Midnight Falls'
+};
+function normalizeBossName(name) {
+  if (!name) return null;
+  // Direct match in ENCOUNTER_MAP values
+  const exact = Object.values(ENCOUNTER_MAP).find(e => e.boss === name);
+  if (exact) return exact.boss;
+  // Alias match
+  const alias = BOSS_ALIAS[name.toLowerCase()];
+  if (alias) return alias;
+  // Partial match (e.g. "Vaelgor & Ezzorak" contains "Vaelgor")
+  const partial = Object.values(ENCOUNTER_MAP).find(e => e.boss.toLowerCase().includes(name.toLowerCase()));
+  if (partial) return partial.boss;
+  return null;
+}
+
+function buildItemBossFallback() {
+  bisRawData.forEach(line => {
+    const items = line.split(':::')[1];
+    if (!items) return;
+    items.split(';;').forEach(entry => {
+      const parts = entry.split('|');
+      if (parts.length >= 3) {
+        const itemName = parts[1].trim().toLowerCase();
+        const source = parts[2].trim();
+        const normalizedBoss = normalizeBossName(source);
+        if (normalizedBoss) {
+          ITEM_BOSS_FALLBACK[itemName] = normalizedBoss;
+        }
+      }
+    });
+  });
+}
+
+function extractBossFromProfilesetName(name) {
+  if (!name) return { boss: 'Unknown', raid: 'Unknown' };
+  const parts = name.split('/');
+  for (const p of parts) {
+    if (ENCOUNTER_MAP[p]) return ENCOUNTER_MAP[p];
+  }
+  return { boss: 'Unknown', raid: 'Unknown' };
+}
+
+function getBossForItem(itemName) {
+  if (!itemName) return null;
+  const key = itemName.toLowerCase();
+  if (ITEM_BOSS_FALLBACK[key]) return ITEM_BOSS_FALLBACK[key];
+  return null;
+}
 
 // ===== BiS CACHE - PARSED FROM bis-data.txt =====
 window.bisCache = {};
@@ -466,6 +580,9 @@ bisRawData.forEach(line => {
   window.bisCache[spec] = {gear: itemArray, trinkets: []};
 });
 
+// Build item → boss fallback map from BiS data
+buildItemBossFallback();
+
 // ===== TRINKET TIER LIST (Raid Only) =====
 window.trinketTierList = {
   S: [
@@ -507,6 +624,7 @@ function showStep(n) {
   if (n === 3) updateS3Stats();
   if (n === 4) renderClassGrid();
   if (n === 5) renderLootHistory();
+  if (n === 6) renderBossPriority();
 }
 
 // ===== CLASS DATA =====
@@ -683,9 +801,12 @@ window.syncFromBackend = async function() {
             parts[3].split(',').forEach(pair => {
               const lc = pair.lastIndexOf(':');
               if (lc > 0) {
-                const item = pair.substring(0, lc).trim();
+                const rawName = pair.substring(0, lc).trim();
                 const gain = parseInt(pair.substring(lc + 1));
-                if (item && gain > 0) upgrades.push({ item, gain });
+                let boss = null, item = rawName;
+                const gtIdx = rawName.indexOf('>');
+                if (gtIdx > 0) { boss = rawName.substring(0, gtIdx).trim(); item = rawName.substring(gtIdx + 1).trim(); }
+                if (item && gain > 0) upgrades.push({ item, gain, boss: boss || undefined });
               }
             });
           }
@@ -699,7 +820,9 @@ window.syncFromBackend = async function() {
         upgrades.forEach(u => {
           const key = (u.item || '').toLowerCase();
           if (key && (u.gain || 0) > 0) {
-            if (!best[key] || u.gain > best[key].gain) best[key] = { item: u.item, gain: u.gain, source: 'Raidbots' };
+            const boss = u.boss || getBossForItem(u.item) || 'Unknown';
+            const raid = u.raid || (Object.values(ENCOUNTER_MAP).find(e => e.boss === boss) || {}).raid || 'Unknown';
+            if (!best[key] || u.gain > best[key].gain) best[key] = { item: u.item, gain: u.gain, source: 'Raidbots', boss, raid };
           }
         });
         Object.entries(best).forEach(([key, val]) => { window.droptimizerData[player][key] = val; });
@@ -740,10 +863,19 @@ window.importMixedDroptimizer = async function() {
       itemPairs.forEach(pair => {
         const lc = pair.lastIndexOf(':');
         if (lc === -1) return;
-        const itemName = pair.substring(0, lc).trim();
+        const rawName = pair.substring(0, lc).trim();
         const gain = parseInt(pair.substring(lc + 1));
+        // Parse boss from v2 format: Boss>ItemName
+        let boss = null, itemName = rawName;
+        const gtIdx = rawName.indexOf('>');
+        if (gtIdx > 0) {
+          boss = rawName.substring(0, gtIdx).trim();
+          itemName = rawName.substring(gtIdx + 1).trim();
+        }
+        if (!boss) boss = getBossForItem(itemName) || 'Unknown';
+        const raid = (Object.values(ENCOUNTER_MAP).find(e => e.boss === boss) || {}).raid || 'Unknown';
         if (itemName && gain > 0) {
-          window.droptimizerData[playerName][itemName.toLowerCase()] = { item: itemName, gain, source: 'Raidbots' };
+          window.droptimizerData[playerName][itemName.toLowerCase()] = { item: itemName, gain, source: 'Raidbots', boss, raid };
           pc++;
         }
       });
@@ -790,9 +922,10 @@ window.processRaidbotsJson = function(data) {
     const info = itemLookup[p.name] || {};
     const itemName = info.name || p.name.split('/').pop() || '?';
     const gain = Math.round(p.mean - baseDps);
+    const bossInfo = extractBossFromProfilesetName(p.name);
     if (gain > 0) {
       const key = itemName.toLowerCase();
-      if (!bestPerItem[key] || gain > bestPerItem[key].gain) bestPerItem[key] = { item: itemName, gain, source: 'Raidbots' };
+      if (!bestPerItem[key] || gain > bestPerItem[key].gain) bestPerItem[key] = { item: itemName, gain, source: 'Raidbots', boss: bossInfo.boss, raid: bossInfo.raid };
     }
   });
   Object.entries(bestPerItem).forEach(([key, val]) => { window.droptimizerData[playerName][key] = val; count++; });
@@ -1041,6 +1174,121 @@ function renderLootHistory() {
   document.getElementById('lootTable').innerHTML = tHtml;
 }
 window.selectedSpec = null;
+
+// ===== BOSS PRIORITY RENDERING =====
+function renderBossPriority() {
+  const gridEl = document.getElementById('bossPriorityGrid');
+  const summaryEl = document.getElementById('bossRosterSummary');
+  if (!gridEl) return;
+
+  const raidFilter = document.getElementById('bossRaidFilter')?.value || 'all';
+  const selected = window.roster.filter(p => window.selectedPlayers.has(p.uid || p.nm));
+
+  if (!selected.length) {
+    gridEl.innerHTML = '<div style="color:#666;text-align:center;padding:40px;">Selecciona jugadores en el tab Roster primero</div>';
+    summaryEl.innerHTML = '';
+    return;
+  }
+
+  // Build boss → player → totalGain map
+  const bossData = {}; // { bossName: { raid, players: { playerName: { totalGain, baseDps, items: [] } } } }
+
+  selected.forEach(p => {
+    const name = p.nm;
+    const dropData = window.droptimizerData[name];
+    if (!dropData) return;
+    const baseDps = dropData._baseDps || 0;
+
+    Object.entries(dropData).forEach(([key, val]) => {
+      if (key.startsWith('_')) return;
+      const boss = val.boss || getBossForItem(val.item) || 'Unknown';
+      const raid = val.raid || (Object.values(ENCOUNTER_MAP).find(e => e.boss === boss) || {}).raid || 'Unknown';
+      if (raidFilter !== 'all' && raid !== raidFilter) return;
+
+      if (!bossData[boss]) bossData[boss] = { raid, players: {} };
+      if (!bossData[boss].players[name]) bossData[boss].players[name] = { totalGain: 0, baseDps, items: [], className: p.cN };
+      bossData[boss].players[name].totalGain += val.gain || 0;
+      bossData[boss].players[name].items.push({ item: val.item, gain: val.gain });
+    });
+  });
+
+  if (!Object.keys(bossData).length) {
+    gridEl.innerHTML = '<div style="color:#666;text-align:center;padding:40px;">No hay datos de Droptimizer con info de boss. Importa datos usando el submit page actualizado o URLs de Raidbots.</div>';
+    summaryEl.innerHTML = '';
+    return;
+  }
+
+  // Sort bosses by total roster value
+  const bossRanking = Object.entries(bossData).map(([boss, data]) => {
+    let totalValue = 0, playerCount = 0;
+    Object.values(data.players).forEach(pd => {
+      if (pd.totalGain > 0) { totalValue += pd.totalGain; playerCount++; }
+    });
+    return { boss, raid: data.raid, totalValue, playerCount, players: data.players };
+  }).sort((a, b) => b.totalValue - a.totalValue);
+
+  // Render summary cards (top bosses by value)
+  let summaryHtml = '<div class="bp-summary-grid">';
+  bossRanking.slice(0, 6).forEach((b, i) => {
+    summaryHtml += '<div class="bp-summary-card">';
+    summaryHtml += '<div class="bp-boss-rank">#' + (i + 1) + '</div>';
+    summaryHtml += '<div class="bp-boss-info"><div class="bp-boss-name">' + b.boss + '</div><div class="bp-boss-raid">' + b.raid + '</div></div>';
+    summaryHtml += '<div class="bp-boss-value"><div class="bp-boss-total">+' + b.totalValue.toLocaleString() + ' DPS</div>';
+    summaryHtml += '<div class="bp-boss-players">' + b.playerCount + ' raiders lo necesitan</div></div>';
+    summaryHtml += '</div>';
+  });
+  summaryHtml += '</div>';
+  summaryEl.innerHTML = summaryHtml;
+
+  // Get all players with droptimizer data
+  const playersWithData = selected.filter(p => {
+    const d = window.droptimizerData[p.nm];
+    return d && Object.keys(d).filter(k => !k.startsWith('_')).length > 0;
+  });
+
+  if (!playersWithData.length) {
+    gridEl.innerHTML = '<div style="color:#666;text-align:center;padding:40px;">Ningun jugador seleccionado tiene datos de Droptimizer.</div>';
+    return;
+  }
+
+  // Find max gain for color scaling
+  let maxGain = 0;
+  bossRanking.forEach(b => {
+    Object.values(b.players).forEach(pd => { if (pd.totalGain > maxGain) maxGain = pd.totalGain; });
+  });
+
+  // Render matrix table
+  let html = '<div style="overflow-x:auto;"><table class="boss-priority-table">';
+  html += '<thead><tr><th>Boss</th>';
+  playersWithData.forEach(p => {
+    const cc = (window.SD[p.cN] || {}).color || '#fff';
+    const shortName = p.nm.length > 10 ? p.nm.substring(0, 9) + '..' : p.nm;
+    html += '<th style="font-size:11px;min-width:60px;"><span style="color:' + cc + ';">' + shortName + '</span></th>';
+  });
+  html += '<th style="color:#2ecc40;">Total Roster</th></tr></thead><tbody>';
+
+  bossRanking.forEach(b => {
+    html += '<tr>';
+    html += '<td class="bp-boss-cell"><div>' + b.boss + '</div><div class="bp-raid-label">' + b.raid + '</div></td>';
+    playersWithData.forEach(p => {
+      const pd = b.players[p.nm];
+      if (!pd || pd.totalGain <= 0) {
+        html += '<td><span class="bp-cell bp-cell-none">—</span></td>';
+      } else {
+        const pct = pd.baseDps > 0 ? ((pd.totalGain / pd.baseDps) * 100).toFixed(1) : '?';
+        const ratio = maxGain > 0 ? pd.totalGain / maxGain : 0;
+        const cls = ratio >= 0.5 ? 'bp-cell-high' : ratio >= 0.2 ? 'bp-cell-med' : 'bp-cell-low';
+        const tooltip = pd.items.map(i => i.item + ': +' + i.gain.toLocaleString()).join('&#10;');
+        html += '<td><span class="bp-cell ' + cls + '" title="' + tooltip + '">' + pct + '%</span></td>';
+      }
+    });
+    html += '<td style="color:#2ecc40;font-weight:bold;">+' + b.totalValue.toLocaleString() + '</td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  gridEl.innerHTML = html;
+}
 
 // ===== RCLOOTCOUNCIL CSV IMPORT =====
 const RCLC_CLASS_MAP = {

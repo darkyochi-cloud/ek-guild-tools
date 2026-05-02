@@ -114,7 +114,7 @@ input::placeholder { color:#555; }
       <div id="backendStatus"></div>
       <div class="top-upgrades" style="margin-top:12px;">
         <table>
-          <thead><tr><th>#</th><th>Item</th><th>Slot</th><th>+DPS</th></tr></thead>
+          <thead><tr><th>#</th><th>Item</th><th>Boss</th><th>Slot</th><th>+DPS</th></tr></thead>
           <tbody id="upgradeTable"></tbody>
         </table>
       </div>
@@ -164,6 +164,32 @@ if (!playerParam) {
 
 let extractedData = null;
 
+// ===== ENCOUNTER ID → BOSS NAME MAP =====
+const ENCOUNTER_MAP = {
+  // The Voidspire
+  '3176': { boss: 'Imperator Averzian', raid: 'The Voidspire' },
+  '3177': { boss: 'Vorasius', raid: 'The Voidspire' },
+  '3178': { boss: 'Vaelgor & Ezzorak', raid: 'The Voidspire' },
+  '3179': { boss: 'Fallen-King Salhadaar', raid: 'The Voidspire' },
+  '3180': { boss: 'Lightblinded Vanguard', raid: 'The Voidspire' },
+  '3181': { boss: 'Crown of the Cosmos', raid: 'The Voidspire' },
+  // The Dreamrift
+  '3306': { boss: 'Chimaerus the Undreamt God', raid: 'The Dreamrift' },
+  // March on Quel'Danas
+  '3182': { boss: "Belo'ren, Child of Al'ar", raid: "March on Quel'Danas" },
+  '3183': { boss: 'Midnight Falls', raid: "March on Quel'Danas" }
+};
+
+function extractBossFromProfilesetName(name) {
+  if (!name) return { boss: 'Unknown', raid: 'Unknown' };
+  const parts = name.split('/');
+  // Try first segment as encounter ID
+  for (const p of parts) {
+    if (ENCOUNTER_MAP[p]) return ENCOUNTER_MAP[p];
+  }
+  return { boss: 'Unknown', raid: 'Unknown' };
+}
+
 async function fetchReport() {
   const urlInput = document.getElementById('reportUrl').value.trim();
   const btn = document.getElementById('fetchBtn');
@@ -212,7 +238,8 @@ function processRaidbotsData(data, reportId, reportUrl) {
 
     const upgrades = profilesets.map(p => {
       const info = itemLookup[p.name] || {};
-      return { item: info.name || '?', slot: info.slot || '?', ilvl: info.ilvl || 0, gain: Math.round(p.mean - baseDps) };
+      const bossInfo = extractBossFromProfilesetName(p.name);
+      return { item: info.name || '?', slot: info.slot || '?', ilvl: info.ilvl || 0, gain: Math.round(p.mean - baseDps), boss: bossInfo.boss, raid: bossInfo.raid };
     }).filter(r => r.gain > 0).sort((a,b) => b.gain - a.gain);
 
     // Deduplicate: keep best gain per item
@@ -221,7 +248,8 @@ function processRaidbotsData(data, reportId, reportUrl) {
     const deduped = Object.values(best).sort((a,b) => b.gain - a.gain);
 
     const displayName = playerParam.charAt(0).toUpperCase() + playerParam.slice(1).toLowerCase();
-    const pairs = deduped.map(u => u.item + ':' + u.gain);
+    // v2 format includes boss: Boss>Item:Gain
+    const pairs = deduped.map(u => (u.boss && u.boss !== 'Unknown' ? u.boss + '>' : '') + u.item + ':' + u.gain);
     const code = 'EK-DROP|' + displayName + '|' + Math.round(baseDps) + '|' + pairs.join(',');
 
     extractedData = { player: displayName, baseDps: Math.round(baseDps), upgrades: deduped, code, reportUrl };
@@ -271,7 +299,7 @@ function renderResults(d) {
 
   const tbody = document.getElementById('upgradeTable');
   tbody.innerHTML = d.upgrades.slice(0, 15).map((u, i) =>
-    '<tr><td style="color:#666;">' + (i+1) + '</td><td>' + u.item + '</td><td style="color:#888;">' + u.slot + '</td><td class="gain-val">+' + u.gain.toLocaleString() + '</td></tr>'
+    '<tr><td style="color:#666;">' + (i+1) + '</td><td>' + u.item + '</td><td style="color:#ff8844;font-size:11px;">' + (u.boss || '?') + '</td><td style="color:#888;">' + u.slot + '</td><td class="gain-val">+' + u.gain.toLocaleString() + '</td></tr>'
   ).join('');
   if (d.upgrades.length > 15) tbody.innerHTML += '<tr><td colspan="4" style="color:#555;text-align:center;">... y ' + (d.upgrades.length - 15) + ' mas</td></tr>';
 
