@@ -281,18 +281,23 @@ async function submitToBackend(d) {
   }
   statusEl.innerHTML = '<div class="submit-status sending">Enviando al servidor...</div>';
   try {
-    // Google Apps Script redirects on POST, causing CORS issues with regular fetch.
-    // mode:'no-cors' sends the data successfully but returns an opaque response.
-    await fetch(BACKEND_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ player: d.player, baseDps: d.baseDps, upgrades: d.upgrades, reportUrl: d.reportUrl || '' })
-    });
-    // With no-cors we can't read the response, but the data is sent
-    statusEl.innerHTML = '<div class="submit-status sent">Listo, ' + d.player + '. Tus datos fueron enviados.</div>';
+    // Send via GET with base64-encoded data to avoid CORS POST issues with Google Apps Script
+    const payload = JSON.stringify({ player: d.player, baseDps: d.baseDps, upgrades: d.upgrades, reportUrl: d.reportUrl || '' });
+    const b64 = btoa(unescape(encodeURIComponent(payload)));
+    const submitUrl = BACKEND_URL + '?action=submit&data=' + encodeURIComponent(b64);
+    const resp = await fetch(submitUrl);
+    if (resp.ok) {
+      const result = await resp.json();
+      if (result.ok) {
+        statusEl.innerHTML = '<div class="submit-status sent">Listo, ' + d.player + '. Tus datos fueron enviados.</div>';
+      } else {
+        throw new Error(result.error || 'Error del servidor');
+      }
+    } else {
+      throw new Error('HTTP ' + resp.status);
+    }
   } catch(e) {
-    statusEl.innerHTML = '<div class="submit-status failed">Error enviando: ' + e.message + '</div>';
+    statusEl.innerHTML = '<div class="submit-status failed">Error enviando al servidor: ' + e.message + '. Los datos se guardaron localmente.</div>';
   }
 }
 

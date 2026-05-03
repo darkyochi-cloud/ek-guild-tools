@@ -9,18 +9,24 @@
 //    - Who has access: Anyone
 // 4. Copy the Web App URL
 // 5. Paste it in ek-droptimizer-submit.html AND ek-loot-advisor-v3.html
-//    where it says BACKEND_URL = '...'
 // ============================================================
 
 const SHEET_NAME = 'Submissions';
 const META_SHEET = 'Sessions';
 
-// ── GET: Fetch submissions ──────────────────────────────────
-// ?action=session           → all submissions for today's session
+// ── GET: Fetch submissions OR save a submission ─────────────
+// ?action=session           → today's submissions (latest per player)
 // ?action=session&date=YYYY-MM-DD → submissions for specific date
 // ?action=all               → every submission ever
+// ?action=submit&data=BASE64JSON → save a submission (avoids CORS POST issues)
 function doGet(e) {
   const action = (e.parameter.action || 'session').toLowerCase();
+
+  // ── SUBMIT via GET (to avoid CORS issues with POST) ──
+  if (action === 'submit') {
+    return handleSubmit(e);
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
   if (!sheet) return jsonResp({ ok: false, error: 'No submissions yet' });
@@ -43,7 +49,6 @@ function doGet(e) {
   const targetDate = e.parameter.date || todayStr();
   const filtered = rows.filter(r => String(r.date) === targetDate);
 
-  // Build player map (latest submission per player for this date)
   const playerMap = {};
   filtered.forEach(r => {
     const name = String(r.player).toLowerCase();
@@ -56,58 +61,72 @@ function doGet(e) {
   return jsonResp({ ok: true, date: targetDate, submissions: latest, count: latest.length });
 }
 
-// ── POST: Save a submission ─────────────────────────────────
-// Body JSON: { player, baseDps, upgrades: [{item,slot,ilvl,gain},...], reportUrl? }
+// ── POST: Save a submission (for non-CORS contexts) ────────
 function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents);
-    const player = String(body.player || '').trim();
-    if (!player) return jsonResp({ ok: false, error: 'Missing player name' });
-
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(SHEET_NAME);
-    if (!sheet) {
-      sheet = ss.insertSheet(SHEET_NAME);
-      sheet.appendRow(['timestamp', 'date', 'player', 'baseDps', 'upgradeCount', 'topItem', 'topGain', 'ekDropCode', 'reportUrl', 'rawUpgrades']);
-      sheet.getRange(1, 1, 1, 10).setFontWeight('bold');
-    }
-
-    const now = new Date();
-    const date = todayStr();
-    const baseDps = Number(body.baseDps) || 0;
-    const upgrades = Array.isArray(body.upgrades) ? body.upgrades : [];
-    const topUpgrade = upgrades.length > 0 ? upgrades[0] : { item: '—', gain: 0 };
-
-    // Build EK-DROP code
-    const pairs = upgrades.map(u => u.item + ':' + u.gain);
-    const ekDropCode = 'EK-DROP|' + player + '|' + baseDps + '|' + pairs.join(',');
-
-    sheet.appendRow([
-      now.toISOString(),
-      date,
-      player,
-      baseDps,
-      upgrades.length,
-      topUpgrade.item,
-      topUpgrade.gain,
-      ekDropCode,
-      body.reportUrl || '',
-      JSON.stringify(upgrades)
-    ]);
-
-    // Update session meta
-    updateSessionMeta(ss, date, player);
-
-    return jsonResp({
-      ok: true,
-      message: player + ' submission saved',
-      date: date,
-      upgradeCount: upgrades.length,
-      ekDropCode: ekDropCode
-    });
+    return saveSubmission(body);
   } catch (err) {
     return jsonResp({ ok: false, error: err.message });
   }
+}
+
+// ── Handle submit via GET ──────────────────────────────────
+function handleSubmit(e) {
+  try {
+    const encoded = e.parameter.data || '';
+    if (!encoded) return jsonResp({ ok: false, error: 'Missing data parameter' });
+    const json = Utilities.newBlob(Utilities.base64Decode(encoded)).getDataAsString();
+    const body = JSON.parse(json);
+    return saveSubmission(body);
+  } catch (err) {
+    return jsonResp({ ok: false, error: err.message });
+  }
+}
+
+// ── Shared save logic ──────────────────────────────────────
+function saveSubmission(body) {
+  const player = String(body.player || '').trim();
+  if (!player) return jsonResp({ ok: false, error: 'Missing player name' });
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    sheet.appendRow(['timestamp', 'date', 'player', 'baseDps', 'upgradeCount', 'topItem', 'topGain', 'ekDropCode', 'reportUrl', 'rawUpgrades']);
+    sheet.getRange(1, 1, 1, 10).setFontWeight('bold');
+  }
+
+  const now = new Date();
+  const date = todayStr();
+  const baseDps = Number(body.baseDps) || 0;
+  const upgrades = Array.isArray(body.upgrades) ? body.upgrades : [];
+  const topUpgrade = upgrades.length > 0 ? upgrades[0] : { item: '—', gain: 0 };
+
+  const pairs = upgrades.map(u => u.item + ':' + u.gain);
+  const ekDropCode = 'EK-DROP|' + player + '|' + baseDps + '|' + pairs.join(',');
+
+  sheet.appendRow([
+    now.toISOString(),
+    date,
+    player,
+    baseDps,
+    upgrades.length,
+    topUpgrade.item,
+    topUpgrade.gain,
+    ekDropCode,
+    body.reportUrl || '',
+    JSON.stringify(upgrades)
+  ]);
+
+  updateSessionMeta(ss, date, player);
+
+  return jsonResp({
+    ok: true,
+    message: player + ' submission saved',
+    date: date,
+    upgradeCount: upgrades.length
+  });
 }
 
 // ── Session Meta Tracking ───────────────────────────────────
