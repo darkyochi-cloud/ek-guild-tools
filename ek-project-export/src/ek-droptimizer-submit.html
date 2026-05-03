@@ -281,11 +281,16 @@ async function submitToBackend(d) {
   }
   statusEl.innerHTML = '<div class="submit-status sending">Enviando al servidor...</div>';
   try {
-    // Send via GET with base64-encoded data to avoid CORS POST issues with Google Apps Script
+    // POST with text/plain is a CORS "simple request" — no preflight, and Apps Script
+    // parses e.postData.contents as JSON regardless of the declared content type.
+    // This avoids URL-length limits that broke the previous GET+base64 approach.
     const payload = JSON.stringify({ player: d.player, baseDps: d.baseDps, upgrades: d.upgrades, reportUrl: d.reportUrl || '' });
-    const b64 = btoa(unescape(encodeURIComponent(payload)));
-    const submitUrl = BACKEND_URL + '?action=submit&data=' + encodeURIComponent(b64);
-    const resp = await fetch(submitUrl);
+    const resp = await fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: payload,
+      redirect: 'follow'
+    });
     if (resp.ok) {
       const result = await resp.json();
       if (result.ok) {
