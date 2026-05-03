@@ -418,7 +418,7 @@ body { background:#0f0f23; color:#e0e0e0; font-family:'Segoe UI',sans-serif; }
 
 <!-- ========== STEP 6: BOSS PRIORITY ========== -->
 <div id="s6" class="step">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
     <div style="color:#ffd700;font-size:16px;font-weight:bold;">Boss Priority — Droptimizer por Boss</div>
     <div style="display:flex;gap:8px;align-items:center;">
       <select id="bossRaidFilter" onchange="renderBossPriority()" style="background:#0d1b2a;border:1px solid #444;color:#ffd700;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;">
@@ -428,6 +428,13 @@ body { background:#0f0f23; color:#e0e0e0; font-family:'Segoe UI',sans-serif; }
         <option value="March on Quel'Danas">March on Quel'Danas</option>
       </select>
       <button class="btn btn-sm btn-purple" onclick="renderBossPriority()">🔄 Refrescar</button>
+    </div>
+  </div>
+  <!-- Quick import: paste Raidbots URLs directly here -->
+  <div style="background:#16213e;border:1px solid #333;border-radius:10px;padding:12px 16px;margin-bottom:12px;">
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input type="text" id="bpQuickUrl" placeholder="Pega URL de Raidbots para importar rapido..." style="flex:1;background:#0d1b2a;border:1px solid #444;color:#fff;padding:8px 12px;border-radius:6px;font-size:13px;" onkeydown="if(event.key==='Enter')quickImportBP()">
+      <button class="btn btn-sm btn-primary" onclick="quickImportBP()">📥 Importar</button>
     </div>
   </div>
   <div id="bossRosterSummary" style="margin-bottom:16px;"></div>
@@ -1289,6 +1296,30 @@ function renderLootHistory() {
   document.getElementById('lootTable').innerHTML = tHtml;
 }
 window.selectedSpec = null;
+
+// ===== BOSS PRIORITY QUICK IMPORT =====
+window.quickImportBP = async function() {
+  const input = document.getElementById('bpQuickUrl');
+  const url = (input?.value || '').trim();
+  if (!url) { toast('Pega una URL de Raidbots', false); return; }
+  const m = url.match(/report\/([a-zA-Z0-9]+)/);
+  if (!m) { toast('URL no valida. Debe ser raidbots.com/simbot/report/XXXXX', false); return; }
+  toast('Importando...', true);
+  try {
+    const resp = await fetch('https://www.raidbots.com/reports/' + m[1] + '/data.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    const count = window.processRaidbotsJson(data);
+    if (count > 0) {
+      window.saveDroptimizerData();
+      const playerName = data.sim.players[0].name;
+      const name = playerName.charAt(0).toUpperCase() + playerName.slice(1);
+      input.value = '';
+      toast('✅ ' + count + ' items importados para ' + name, true);
+      renderBossPriority();
+    } else { toast('No se encontraron upgrades en ese reporte', false); }
+  } catch(e) { toast('Error al importar: ' + e.message + '. Si es CORS, importa desde el tab Boss & Loot.', false); }
+};
 
 // ===== BOSS PRIORITY RENDERING =====
 function renderBossPriority() {

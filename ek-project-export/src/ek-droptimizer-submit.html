@@ -281,18 +281,49 @@ function processRaidbotsData(data, reportId, reportUrl) {
   } catch(e) { showStatus('err', 'Error procesando datos: ' + e.message); }
 }
 
-// ===== BACKEND SUBMISSION =====
+// ===== SAVE TO SHARED LOCALSTORAGE =====
+// Both submit page and advisor are on the same GitHub Pages domain,
+// so they share localStorage. This makes data instantly available.
+function saveToSharedStorage(d) {
+  try {
+    const existing = JSON.parse(localStorage.getItem('ek_droptimizer') || '{}');
+    if (!existing[d.player]) existing[d.player] = {};
+    existing[d.player]._baseDps = d.baseDps;
+    existing[d.player]._submittedAt = new Date().toISOString();
+    // Store each upgrade keyed by lowercase item name
+    const best = {};
+    d.upgrades.forEach(u => {
+      const key = (u.item || '').toLowerCase();
+      if (key && u.gain > 0) {
+        if (!best[key] || u.gain > best[key].gain) {
+          best[key] = { item: u.item, gain: u.gain, source: 'Raidbots', boss: u.boss || 'Unknown', raid: u.raid || 'Unknown', slot: u.slot || null };
+        }
+      }
+    });
+    Object.entries(best).forEach(([key, val]) => { existing[d.player][key] = val; });
+    localStorage.setItem('ek_droptimizer', JSON.stringify(existing));
+    return true;
+  } catch(e) { return false; }
+}
+
 async function submitToBackend(d) {
   const statusEl = document.getElementById('backendStatus');
+  // Always save to shared localStorage first (works on same domain)
+  const saved = saveToSharedStorage(d);
+
   if (!BACKEND_URL) {
-    statusEl.innerHTML = '<div class="submit-status sent">📦 Datos extraidos. Copia el codigo de abajo y pegalo en Discord #droptimizer.</div>';
+    if (saved) {
+      statusEl.innerHTML = '<div class="submit-status sent">✅ Datos guardados. El Raid Leader puede verlos en el Loot Advisor → Boss Priority.</div>';
+    } else {
+      statusEl.innerHTML = '<div class="submit-status sent">📦 Datos extraidos. Copia el codigo de abajo y pegalo en Discord #droptimizer.</div>';
+    }
     return;
   }
   statusEl.innerHTML = '<div class="submit-status sending">⏳ Enviando al servidor de la guild...</div>';
   try {
     const resp = await fetch(BACKEND_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },  // Apps Script needs text/plain to avoid CORS preflight
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({
         player: d.player,
         baseDps: d.baseDps,
@@ -307,7 +338,7 @@ async function submitToBackend(d) {
       throw new Error(result.error || 'Unknown error');
     }
   } catch(e) {
-    statusEl.innerHTML = '<div class="submit-status failed">⚠️ No se pudo enviar automaticamente. Copia el codigo de abajo y pegalo en Discord #droptimizer.</div>';
+    statusEl.innerHTML = '<div class="submit-status failed">⚠️ No se pudo enviar al servidor, pero los datos se guardaron localmente. El Raid Leader puede verlos si usa este mismo navegador.</div>';
   }
 }
 
