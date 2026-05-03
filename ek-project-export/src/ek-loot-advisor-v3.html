@@ -735,7 +735,7 @@ function showStep(n) {
   if (n === 3) updateS3Stats();
   if (n === 4) renderClassGrid();
   if (n === 5) renderLootHistory();
-  if (n === 6) renderBossPriority();
+  if (n === 6) { syncAndRenderBossPriority(); }
 }
 
 // ===== CLASS DATA =====
@@ -849,7 +849,7 @@ window.initWeightSliders = function() {
 
 // ===== DROPTIMIZER BACKEND URL =====
 // Paste your Google Apps Script Web App URL here to enable auto-sync
-const BACKEND_URL = '';  // <-- PASTE YOUR APPS SCRIPT URL HERE
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxxjXkMtyS0zcowk5ZUlU5viL4VSneW1v7KXRyi7VhMPp-QJF8liJaP61XovJHEMLjPoA/exec';
 
 // ===== BLIZZARD API CONFIG =====
 const BLIZZARD_CLIENT_ID     = 'a9bac31a3ba249c9a0d0850c6fa34ed8';
@@ -1296,6 +1296,50 @@ function renderLootHistory() {
   document.getElementById('lootTable').innerHTML = tHtml;
 }
 window.selectedSpec = null;
+
+// ===== BOSS PRIORITY AUTO-SYNC =====
+async function syncAndRenderBossPriority() {
+  renderBossPriority(); // Render immediately with local data
+  if (!BACKEND_URL) return;
+  // Fetch all submissions from backend and merge into local data
+  try {
+    const resp = await fetch(BACKEND_URL + '?action=all');
+    if (!resp.ok) return;
+    const result = await resp.json();
+    if (!result.ok || !result.submissions?.length) return;
+    let imported = 0;
+    result.submissions.forEach(sub => {
+      const player = sub.player;
+      if (!player) return;
+      let upgrades = [];
+      try { upgrades = JSON.parse(sub.rawUpgrades || '[]'); } catch(e) {}
+      if (!upgrades.length) return;
+      // Check if this submission is newer than what we have
+      const existing = window.droptimizerData[player];
+      const existingTime = existing?._submittedAt ? new Date(existing._submittedAt) : new Date(0);
+      const subTime = sub.timestamp ? new Date(sub.timestamp) : new Date(0);
+      if (existing && existingTime >= subTime) return; // Already have newer data
+      if (!window.droptimizerData[player]) window.droptimizerData[player] = {};
+      window.droptimizerData[player]._baseDps = Number(sub.baseDps) || 0;
+      window.droptimizerData[player]._submittedAt = sub.timestamp || new Date().toISOString();
+      const best = {};
+      upgrades.forEach(u => {
+        const key = (u.item || '').toLowerCase();
+        if (key && (u.gain || 0) > 0) {
+          const boss = u.boss || getBossForItem(u.item) || 'Unknown';
+          const raid = u.raid || (Object.values(ENCOUNTER_MAP).find(e => e.boss === boss) || {}).raid || 'Unknown';
+          if (!best[key] || u.gain > best[key].gain) best[key] = { item: u.item, gain: u.gain, source: 'Raidbots', boss, raid, slot: u.slot || null };
+        }
+      });
+      Object.entries(best).forEach(([key, val]) => { window.droptimizerData[player][key] = val; });
+      imported++;
+    });
+    if (imported > 0) {
+      window.saveDroptimizerData();
+      renderBossPriority(); // Re-render with new data
+    }
+  } catch(e) { /* silent fail - local data still shows */ }
+}
 
 // ===== BOSS PRIORITY QUICK IMPORT =====
 window.quickImportBP = async function() {
