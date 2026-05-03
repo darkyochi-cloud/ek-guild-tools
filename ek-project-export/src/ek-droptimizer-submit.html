@@ -165,29 +165,45 @@ if (!playerParam) {
 let extractedData = null;
 
 // ===== ENCOUNTER ID → BOSS NAME MAP =====
+// IDs from Raidbots data.json (Journal Encounter IDs)
 const ENCOUNTER_MAP = {
-  // The Voidspire
-  '3176': { boss: 'Imperator Averzian', raid: 'The Voidspire' },
-  '3177': { boss: 'Vorasius', raid: 'The Voidspire' },
-  '3178': { boss: 'Vaelgor & Ezzorak', raid: 'The Voidspire' },
-  '3179': { boss: 'Fallen-King Salhadaar', raid: 'The Voidspire' },
-  '3180': { boss: 'Lightblinded Vanguard', raid: 'The Voidspire' },
-  '3181': { boss: 'Crown of the Cosmos', raid: 'The Voidspire' },
-  // The Dreamrift
-  '3306': { boss: 'Chimaerus the Undreamt God', raid: 'The Dreamrift' },
-  // March on Quel'Danas
-  '3182': { boss: "Belo'ren, Child of Al'ar", raid: "March on Quel'Danas" },
-  '3183': { boss: 'Midnight Falls', raid: "March on Quel'Danas" }
+  // The Voidspire (instanceId: 1307)
+  '2733': { boss: 'Imperator Averzian', raid: 'The Voidspire' },
+  '2734': { boss: 'Vorasius', raid: 'The Voidspire' },
+  '2735': { boss: 'Vaelgor & Ezzorak', raid: 'The Voidspire' },
+  '2736': { boss: 'Fallen-King Salhadaar', raid: 'The Voidspire' },
+  '2737': { boss: 'Lightblinded Vanguard', raid: 'The Voidspire' },
+  '2738': { boss: 'Crown of the Cosmos', raid: 'The Voidspire' },
+  // The Dreamrift (instanceId: 1314)
+  '2795': { boss: 'Chimaerus the Undreamt God', raid: 'The Dreamrift' },
+  // March on Quel'Danas (instanceId: 1308)
+  '2739': { boss: "Belo'ren, Child of Al'ar", raid: "March on Quel'Danas" },
+  '2740': { boss: 'Midnight Falls', raid: "March on Quel'Danas" }
 };
+const INSTANCE_MAP = { '1307': 'The Voidspire', '1314': 'The Dreamrift', '1308': "March on Quel'Danas" };
 
 function extractBossFromProfilesetName(name) {
   if (!name) return { boss: 'Unknown', raid: 'Unknown' };
   const parts = name.split('/');
-  // Try first segment as encounter ID
+  // Format: instanceId/encounterId/difficulty/itemId/ilvl/...
+  // encounterId is at index 1
+  if (parts.length >= 2 && ENCOUNTER_MAP[parts[1]]) return ENCOUNTER_MAP[parts[1]];
+  // Fallback: try all segments
   for (const p of parts) {
     if (ENCOUNTER_MAP[p]) return ENCOUNTER_MAP[p];
   }
   return { boss: 'Unknown', raid: 'Unknown' };
+}
+
+function extractBossFromDroptimizerItem(entry) {
+  // droptimizerItems have rich encounter data embedded
+  const enc = entry?.item?.encounter;
+  if (enc?.name) {
+    const raid = entry?.item?.instance?.name || INSTANCE_MAP[entry?.item?.instanceId] || 'Unknown';
+    return { boss: enc.name, raid };
+  }
+  // Fallback to profileset name parsing
+  return extractBossFromProfilesetName(entry?.id);
 }
 
 async function fetchReport() {
@@ -234,11 +250,14 @@ function processRaidbotsData(data, reportId, reportUrl) {
     const profilesets = data.sim.profilesets.results;
     const dropItems = data.simbot?.meta?.rawFormData?.droptimizerItems || [];
     const itemLookup = {};
-    dropItems.forEach(e => { itemLookup[e.id] = { name: e.item?.name || '?', slot: e.slot || '?', ilvl: e.item?.itemLevel || 0 }; });
+    dropItems.forEach(e => {
+      const bossInfo = extractBossFromDroptimizerItem(e);
+      itemLookup[e.id] = { name: e.item?.name || '?', slot: e.slot || '?', ilvl: e.item?.itemLevel || 0, boss: bossInfo.boss, raid: bossInfo.raid };
+    });
 
     const upgrades = profilesets.map(p => {
       const info = itemLookup[p.name] || {};
-      const bossInfo = extractBossFromProfilesetName(p.name);
+      const bossInfo = info.boss ? { boss: info.boss, raid: info.raid } : extractBossFromProfilesetName(p.name);
       return { item: info.name || '?', slot: info.slot || '?', ilvl: info.ilvl || 0, gain: Math.round(p.mean - baseDps), boss: bossInfo.boss, raid: bossInfo.raid };
     }).filter(r => r.gain > 0).sort((a,b) => b.gain - a.gain);
 
