@@ -517,10 +517,106 @@ function extractBossFromProfilesetName(name) {
   return { boss: 'Unknown', raid: 'Unknown' };
 }
 
+// Static item → boss map for items NOT in BiS data but in raid loot tables
+const RAID_LOOT_TABLE = {
+  // Imperator Averzian (3176)
+  'endless march waistwrap': 'Imperator Averzian', 'leggings of the devouring advance': 'Imperator Averzian',
+  "devouring night's visage": 'Imperator Averzian', 'void-claimed shinkickers': 'Imperator Averzian',
+  'robes of the voidbound': 'Imperator Averzian', 'sabatons of obscurement': 'Imperator Averzian',
+  'light-judged spaulders': 'Imperator Averzian', "light's march bracers": 'Imperator Averzian',
+  "imperator's banner": 'Imperator Averzian', 'weight of command': 'Imperator Averzian',
+  'sunstrike rifle': 'Imperator Averzian', 'bulwark of noble resolve': 'Imperator Averzian',
+  'light company guidon': 'Imperator Averzian',
+  // Vorasius (3177)
+  'voracious wristwraps': 'Vorasius', 'void-skinned bracers': 'Vorasius',
+  "frenzy's rebuke": 'Vorasius', 'parasite stompers': 'Vorasius',
+  'signet of the starved beast': 'Vorasius', 'hungering victory': 'Vorasius',
+  'inescapable reach': 'Vorasius', 'grimoire of the eternal light': 'Vorasius',
+  'heart of ancient hunger': 'Vorasius',
+  // Fallen-King Salhadaar (3179)
+  'despotic raiment': 'Fallen-King Salhadaar', 'twisted twilight sash': 'Fallen-King Salhadaar',
+  "fallen king's cuffs": 'Fallen-King Salhadaar', 'crown of the fractured tyrant': 'Fallen-King Salhadaar',
+  'ribbon of coiled malice': 'Fallen-King Salhadaar', "tormentor's bladed fists": 'Fallen-King Salhadaar',
+  'blade of the final twilight': 'Fallen-King Salhadaar', 'volatile void suffuser': 'Fallen-King Salhadaar',
+  'wraps of cosmic madness': 'Fallen-King Salhadaar',
+  // Vaelgor & Ezzorak (3178)
+  'slippers of the midnight flame': 'Vaelgor & Ezzorak', "vaelgor's fearsome grasp": 'Vaelgor & Ezzorak',
+  "nullwalker's dread epaulettes": 'Vaelgor & Ezzorak', "ezzorak's gloombind": 'Vaelgor & Ezzorak',
+  'draconic nullcape': 'Vaelgor & Ezzorak', "clutchmates' caress": 'Vaelgor & Ezzorak',
+  'emblazoned sunglaive': 'Vaelgor & Ezzorak', 'gloom-spattered dreadscale': 'Vaelgor & Ezzorak',
+  "vaelgor's final stare": 'Vaelgor & Ezzorak',
+  // Lightblinded Vanguard (3180)
+  "war chaplain's grips": 'Lightblinded Vanguard', 'blooming barklight spaulders': 'Lightblinded Vanguard',
+  'waistcord of the judged': 'Lightblinded Vanguard', 'lightblood greaves': 'Lightblinded Vanguard',
+  'bond of light': 'Lightblinded Vanguard', 'blade of the blind verdict': 'Lightblinded Vanguard',
+  "bellamy's final judgement": 'Lightblinded Vanguard', 'litany of lightblind wrath': 'Lightblinded Vanguard',
+  // Crown of the Cosmos (3181)
+  'gaze of the unrestrained': 'Crown of the Cosmos', "canopy walker's footwraps": 'Crown of the Cosmos',
+  "nightblade's pantaloons": 'Crown of the Cosmos', "untethered berserker's grips": 'Crown of the Cosmos',
+  'hate-tied waistchain': 'Crown of the Cosmos', 'sunbound breastplate': 'Crown of the Cosmos',
+  'eternal voidsong chain': 'Crown of the Cosmos', "turalyon's false echo": 'Crown of the Cosmos',
+  "arator's swift remembrance": 'Crown of the Cosmos', "ranger-captain's lethal recurve": 'Crown of the Cosmos',
+  "locus-walker's ribbon": 'Crown of the Cosmos', "ranger-captain's iridescent insignia": 'Crown of the Cosmos',
+  // Chimaerus the Undreamt God (3306)
+  'dream-scorched striders': 'Chimaerus the Undreamt God', "scorn-scarred shul'ka's belt": 'Chimaerus the Undreamt God',
+  'scornbane waistguard': 'Chimaerus the Undreamt God', 'greaves of the unformed': 'Chimaerus the Undreamt God',
+  'alnscorned spire': 'Chimaerus the Undreamt God', 'tome of alnscorned regret': 'Chimaerus the Undreamt God',
+  'gaze of the alnseer': 'Chimaerus the Undreamt God', "undreamt god's oozing vestige": 'Chimaerus the Undreamt God',
+  // Belo'ren, Child of Al'ar (3182)
+  'whisper-inscribed sash': "Belo'ren, Child of Al'ar", 'echoing void mantle': "Belo'ren, Child of Al'ar",
+  "radiant clutchtender's jerkin": "Belo'ren, Child of Al'ar", 'eternal flame scaleguards': "Belo'ren, Child of Al'ar",
+  'darkstrider treads': "Belo'ren, Child of Al'ar", 'emberborn grasps': "Belo'ren, Child of Al'ar",
+  "sin'dorei band of hope": "Belo'ren, Child of Al'ar", 'radiant plume': "Belo'ren, Child of Al'ar",
+  'umbral plume': "Belo'ren, Child of Al'ar", 'the eternal egg': "Belo'ren, Child of Al'ar",
+  "belo'melorn, the shattered talon": "Belo'ren, Child of Al'ar", "belo'ren's swift talon": "Belo'ren, Child of Al'ar",
+  'thalassian dawnguard': "Belo'ren, Child of Al'ar",
+  // Midnight Falls / L'ura (3183)
+  'robes of endless oblivion': 'Midnight Falls', 'mask of darkest intent': 'Midnight Falls',
+  'oblivion guise': 'Midnight Falls', 'extinction guards': 'Midnight Falls',
+  'amulet of the abyssal hymn': 'Midnight Falls', 'eye of midnight': 'Midnight Falls',
+  'light of the cosmic crescendo': 'Midnight Falls', 'shadow of the empyrean requiem': 'Midnight Falls',
+  'lightless lament': 'Midnight Falls', "alah'endal, the dawnsong": 'Midnight Falls',
+  'brazier of the dissonant dirge': 'Midnight Falls'
+};
+
+// Tier token slot → boss mapping (Voidspire tier drops)
+const TIER_SLOT_BOSS = {
+  'hands': 'Vorasius',          // Hands token from Vorasius
+  'shoulder': 'Fallen-King Salhadaar', // Shoulder token from Salhadaar
+  'legs': 'Vaelgor & Ezzorak',  // Legs token from Vaelgor & Ezzorak
+  'head': 'Lightblinded Vanguard', // Head token from Lightblinded Vanguard
+  'chest': 'Chimaerus the Undreamt God'  // Chest token from Chimaerus
+};
+
 function getBossForItem(itemName) {
   if (!itemName) return null;
   const key = itemName.toLowerCase();
+  // Check BiS-derived fallback first
   if (ITEM_BOSS_FALLBACK[key]) return ITEM_BOSS_FALLBACK[key];
+  // Check static raid loot table
+  if (RAID_LOOT_TABLE[key]) return RAID_LOOT_TABLE[key];
+  return null;
+}
+
+// Enhanced: also check item slot for tier pieces
+function getBossForItemWithSlot(itemName, slot) {
+  const boss = getBossForItem(itemName);
+  if (boss) return boss;
+  // Try tier token detection by slot if item name contains tier set keywords
+  if (slot && itemName) {
+    const tierKeywords = ["ra-den's chosen", "luminous bloom", "black talon", "primal sentry",
+      "night ender", "abyssal immolator", "voidbreaker", "relentless rider",
+      "devouring reaver", "spurned val'kyr"];
+    const nameLower = itemName.toLowerCase();
+    if (tierKeywords.some(kw => nameLower.includes(kw))) {
+      const slotNorm = slot.replace(/[0-9]/g, '').toLowerCase();
+      const slotMap = { 'head': 'head', 'helm': 'head', 'shoulder': 'shoulder', 'shoulders': 'shoulder',
+        'chest': 'chest', 'hands': 'hands', 'gloves': 'hands', 'legs': 'legs', 'wrist': 'wrist',
+        'waist': 'waist', 'feet': 'feet', 'back': 'back' };
+      const normSlot = slotMap[slotNorm] || slotNorm;
+      if (TIER_SLOT_BOSS[normSlot]) return TIER_SLOT_BOSS[normSlot];
+    }
+  }
   return null;
 }
 
@@ -1185,7 +1281,40 @@ function renderBossPriority() {
   const selected = window.roster.filter(p => window.selectedPlayers.has(p.uid || p.nm));
 
   if (!selected.length) {
-    gridEl.innerHTML = '<div style="color:#666;text-align:center;padding:40px;">Selecciona jugadores en el tab Roster primero</div>';
+    gridEl.innerHTML = '<div style="color:#666;text-align:center;padding:40px;">Selecciona jugadores en el tab Roster primero.<br><span style="font-size:11px;">Roster: ' + window.roster.length + ' jugadores cargados, ' + window.selectedPlayers.size + ' seleccionados.</span></div>';
+    summaryEl.innerHTML = '';
+    return;
+  }
+
+  // Count how many selected players have droptimizer data
+  let playersWithDropData = 0;
+  let totalDropItems = 0;
+  selected.forEach(p => {
+    const d = window.droptimizerData[p.nm];
+    if (d) {
+      const items = Object.keys(d).filter(k => !k.startsWith('_'));
+      if (items.length > 0) { playersWithDropData++; totalDropItems += items.length; }
+    }
+  });
+
+  if (playersWithDropData === 0) {
+    // Show diagnostic info
+    const allDropPlayers = Object.keys(window.droptimizerData).filter(k => {
+      const d = window.droptimizerData[k];
+      return d && Object.keys(d).filter(j => !j.startsWith('_')).length > 0;
+    });
+    let diagHtml = '<div style="color:#666;text-align:center;padding:40px;">';
+    diagHtml += '<div style="font-size:16px;margin-bottom:12px;">No hay datos de Droptimizer para los jugadores seleccionados.</div>';
+    diagHtml += '<div style="font-size:12px;color:#888;margin-bottom:8px;">Jugadores seleccionados: <b style="color:#ffd700;">' + selected.length + '</b></div>';
+    if (allDropPlayers.length > 0) {
+      diagHtml += '<div style="font-size:12px;color:#888;">Droptimizer disponible para: <b style="color:#2ecc40;">' + allDropPlayers.join(', ') + '</b></div>';
+      diagHtml += '<div style="font-size:11px;color:#ff8844;margin-top:8px;">Los nombres deben coincidir exactamente con el roster.</div>';
+    } else {
+      diagHtml += '<div style="font-size:12px;color:#ff8844;">No hay datos de Droptimizer cargados en esta sesion.</div>';
+      diagHtml += '<div style="font-size:11px;color:#888;margin-top:8px;">Importa datos: pega codigos EK-DROP o URLs de Raidbots en el tab "Boss & Loot".</div>';
+    }
+    diagHtml += '</div>';
+    gridEl.innerHTML = diagHtml;
     summaryEl.innerHTML = '';
     return;
   }
@@ -1201,7 +1330,8 @@ function renderBossPriority() {
 
     Object.entries(dropData).forEach(([key, val]) => {
       if (key.startsWith('_')) return;
-      const boss = val.boss || getBossForItem(val.item) || 'Unknown';
+      if (!val || typeof val !== 'object') return;
+      const boss = val.boss || getBossForItemWithSlot(val.item, val.slot) || 'Unknown';
       const raid = val.raid || (Object.values(ENCOUNTER_MAP).find(e => e.boss === boss) || {}).raid || 'Unknown';
       if (raidFilter !== 'all' && raid !== raidFilter) return;
 
@@ -1213,7 +1343,7 @@ function renderBossPriority() {
   });
 
   if (!Object.keys(bossData).length) {
-    gridEl.innerHTML = '<div style="color:#666;text-align:center;padding:40px;">No hay datos de Droptimizer con info de boss. Importa datos usando el submit page actualizado o URLs de Raidbots.</div>';
+    gridEl.innerHTML = '<div style="color:#666;text-align:center;padding:40px;">Datos de Droptimizer encontrados (' + playersWithDropData + ' jugadores, ' + totalDropItems + ' items) pero no se pudieron mapear a bosses.<br><span style="font-size:11px;color:#888;">Reimporta datos usando el submit page actualizado o pega URLs de Raidbots directamente.</span></div>';
     summaryEl.innerHTML = '';
     return;
   }
