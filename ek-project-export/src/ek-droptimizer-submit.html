@@ -12,17 +12,15 @@ body { background:#0f0f23; color:#e0e0e0; font-family:'Segoe UI',sans-serif; min
 .header .logo-icon { width:48px; height:48px; background:#a335ee; border-radius:12px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:20px; color:#fff; }
 .header h1 { color:#ffd700; font-size:22px; }
 .header .sub { color:#888; font-size:13px; margin-top:4px; }
-.player-banner { background:linear-gradient(135deg,#2d1b4e,#1a1a3e); padding:16px 20px; border-bottom:2px solid #a335ee; text-align:center; width:100%; }
+.player-banner { background:linear-gradient(135deg,#2d1b4e,#1a1a3e); padding:16px 20px; border-bottom:2px solid #a335ee; text-align:center; width:100%; display:none; }
 .player-banner .name { color:#a335ee; font-size:28px; font-weight:bold; }
 .player-banner .realm { color:#888; font-size:14px; }
 .container { max-width:700px; width:100%; padding:24px 16px; }
 .card { background:#16213e; border:1px solid #333; border-radius:12px; padding:20px; margin-bottom:16px; }
 .card-title { color:#ffd700; font-size:16px; font-weight:bold; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
 .step-num { width:28px; height:28px; background:#a335ee; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:14px; color:#fff; flex-shrink:0; }
-input[type=url],input[type=text] { width:100%; background:#0d1b2a; border:1px solid #444; color:#fff; padding:12px 16px; border-radius:8px; font-size:14px; outline:none; }
-select.player-select { width:100%; background:#0d1b2a; border:1px solid #444; color:#fff; padding:12px 16px; border-radius:8px; font-size:14px; outline:none; cursor:pointer; }
-select.player-select option { background:#0d1b2a; color:#fff; }
-input:focus,select:focus { border-color:#a335ee; }
+input[type=url] { width:100%; background:#0d1b2a; border:1px solid #444; color:#fff; padding:12px 16px; border-radius:8px; font-size:14px; outline:none; }
+input:focus { border-color:#a335ee; }
 input::placeholder { color:#555; }
 .btn { border:none; padding:12px 24px; border-radius:8px; font-size:14px; font-weight:bold; cursor:pointer; transition:all 0.2s; }
 .btn:hover { transform:scale(1.03); }
@@ -37,8 +35,6 @@ input::placeholder { color:#555; }
 .result-box { background:#0d1b2a; border:1px solid #a335ee; border-radius:8px; padding:16px; margin-top:16px; display:none; position:relative; }
 .result-box.show { display:block; }
 .result-summary .stat { color:#ffd700; font-weight:bold; }
-.code-area { background:#0a0a1a; border:1px solid #444; border-radius:8px; padding:12px; font-family:monospace; font-size:11px; color:#aaa; max-height:100px; overflow-y:auto; word-break:break-all; cursor:text; user-select:all; }
-.copy-btn { position:absolute; top:12px; right:12px; }
 .top-upgrades table { width:100%; border-collapse:collapse; font-size:12px; }
 .top-upgrades th { text-align:left; padding:6px 8px; color:#ffd700; border-bottom:1px solid #333; }
 .top-upgrades td { padding:6px 8px; border-bottom:1px solid #1a1a2e; }
@@ -66,7 +62,7 @@ input::placeholder { color:#555; }
   </div>
 </div>
 
-<div class="player-banner" id="playerBanner" style="display:none;">
+<div class="player-banner" id="playerBanner">
   <div class="name" id="playerDisplayName">—</div>
   <div class="realm" id="playerRealm">Ragnaros-US</div>
 </div>
@@ -74,140 +70,75 @@ input::placeholder { color:#555; }
 <div class="container">
 
   <div class="card">
-    <div class="card-title"><div class="step-num">1</div> Selecciona tu personaje</div>
-    <select class="player-select" id="playerSelect" onchange="selectPlayer()">
-      <option value="">-- Elige tu personaje --</option>
-    </select>
+    <div class="card-title"><div class="step-num">1</div> Corre tu Droptimizer</div>
+    <div style="color:#888;font-size:13px;line-height:1.6;">
+      Ve a <a href="https://www.raidbots.com/simbot/droptimizer" target="_blank" style="color:#3498db;">Raidbots Droptimizer</a>,
+      carga tu personaje, selecciona <b>Season 1 Raids &rarr; Mythic</b>, y corre la sim.
+    </div>
   </div>
 
-  <div id="mainContent" style="display:none;">
-
-    <div class="card">
-      <div class="card-title"><div class="step-num">2</div> Corre tu Droptimizer</div>
-      <div style="color:#888;font-size:13px;line-height:1.6;margin-bottom:12px;">
-        Ve a <a href="https://www.raidbots.com/simbot/droptimizer" target="_blank" style="color:#3498db;">Raidbots Droptimizer</a>,
-        carga tu personaje, selecciona <b>Season 1 Raids &rarr; Mythic</b>, y corre la sim.
-      </div>
+  <div class="card">
+    <div class="card-title"><div class="step-num">2</div> Pega la URL de tu reporte</div>
+    <input type="url" id="reportUrl" placeholder="https://www.raidbots.com/simbot/report/XXXXX..." autocomplete="off">
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <button class="btn btn-primary" id="fetchBtn" onclick="fetchReport()">🔍 Extraer y Enviar</button>
     </div>
-
-    <div class="card">
-      <div class="card-title"><div class="step-num">3</div> Pega la URL de tu reporte</div>
-      <input type="url" id="reportUrl" placeholder="https://www.raidbots.com/simbot/report/XXXXX..." autocomplete="off">
-      <div style="display:flex; gap:8px; margin-top:12px;">
-        <button class="btn btn-primary" id="fetchBtn" onclick="fetchReport()">🔍 Extraer y Enviar</button>
-      </div>
-      <div class="status" id="fetchStatus"></div>
-    </div>
-
-    <!-- Results -->
-    <div class="result-box" id="resultBox">
-      <button class="btn btn-green btn-sm copy-btn" onclick="copyCode()">📋 Copiar Codigo</button>
-      <div class="result-summary">
-        <div style="margin-top:8px;">
-          Base DPS: <span class="stat" id="resBase">—</span> &nbsp;|&nbsp;
-          Upgrades: <span class="stat" id="resCount">—</span> &nbsp;|&nbsp;
-          Top: <span class="stat" id="resTop">—</span>
-        </div>
-      </div>
-      <div id="backendStatus"></div>
-      <div class="top-upgrades" style="margin-top:12px;">
-        <table>
-          <thead><tr><th>#</th><th>Item</th><th>Boss</th><th>Slot</th><th>+DPS</th></tr></thead>
-          <tbody id="upgradeTable"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Manual fallback -->
-    <div class="card" id="manualCard" style="display:none;">
-      <div class="card-title">Metodo Manual</div>
-      <div style="color:#888;font-size:13px;margin-bottom:8px;">
-        Si el fetch fallo, abre esta URL en tu navegador, selecciona todo (Ctrl+A), copia (Ctrl+C) y pega aqui:
-      </div>
-      <div style="background:#0d1b2a;padding:8px 12px;border-radius:6px;font-family:monospace;font-size:12px;color:#ff8844;margin-bottom:8px;word-break:break-all;" id="manualUrl"></div>
-      <div class="manual-section">
-        <textarea id="manualJson" placeholder="Pega el JSON del data.json aqui..."></textarea>
-        <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="parseManualJson()">📥 Procesar</button>
-      </div>
-    </div>
-
+    <div class="status" id="fetchStatus"></div>
   </div>
+
+  <!-- Results -->
+  <div class="result-box" id="resultBox">
+    <div class="result-summary">
+      <div style="margin-top:8px;">
+        Base DPS: <span class="stat" id="resBase">—</span> &nbsp;|&nbsp;
+        Upgrades: <span class="stat" id="resCount">—</span> &nbsp;|&nbsp;
+        Top: <span class="stat" id="resTop">—</span>
+      </div>
+    </div>
+    <div id="backendStatus"></div>
+    <div class="top-upgrades" style="margin-top:12px;">
+      <table>
+        <thead><tr><th>#</th><th>Item</th><th>Boss</th><th>Slot</th><th>+DPS</th></tr></thead>
+        <tbody id="upgradeTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Manual fallback -->
+  <div class="card" id="manualCard" style="display:none;">
+    <div class="card-title">Metodo Manual</div>
+    <div style="color:#888;font-size:13px;margin-bottom:8px;">
+      Si el fetch fallo, abre esta URL en tu navegador, selecciona todo (Ctrl+A), copia (Ctrl+C) y pega aqui:
+    </div>
+    <div style="background:#0d1b2a;padding:8px 12px;border-radius:6px;font-family:monospace;font-size:12px;color:#ff8844;margin-bottom:8px;word-break:break-all;" id="manualUrl"></div>
+    <div class="manual-section">
+      <textarea id="manualJson" placeholder="Pega el JSON del data.json aqui..."></textarea>
+      <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="parseManualJson()">📥 Procesar</button>
+    </div>
+  </div>
+
 </div>
 
-<div class="footer">Eternal Karma Droptimizer Submit v4.0</div>
+<div class="footer">Eternal Karma Droptimizer Submit v5.0</div>
 
 <script>
 const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxxjXkMtyS0zcowk5ZUlU5viL4VSneW1v7KXRyi7VhMPp-QJF8liJaP61XovJHEMLjPoA/exec';
 
-// ===== ROSTER: load from localStorage (shared with advisor) =====
-let selectedPlayer = null;
-
-function loadRoster() {
-  const select = document.getElementById('playerSelect');
+// ===== ROSTER: load from localStorage to match character names =====
+function findRosterName(rawName) {
+  // Try to match the sim character name to a roster main
   const roster = JSON.parse(localStorage.getItem('ek_roster') || '[]');
-  // Get mains only, sorted by name
-  const mains = roster.filter(p => p.isMain).sort((a, b) => (a.nm || a.name || '').localeCompare(b.nm || b.name || ''));
-  if (mains.length > 0) {
-    mains.forEach(p => {
-      const name = p.nm || p.name;
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name + ' — ' + (p.cN || p.className || '') + ' ' + (p.sN || p.spec || '');
-      select.appendChild(opt);
-    });
-  } else {
-    // No roster in localStorage - allow manual text input
-    select.style.display = 'none';
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.id = 'playerManualInput';
-    input.placeholder = 'Escribe tu nombre de personaje...';
-    input.style.cssText = 'width:100%;background:#0d1b2a;border:1px solid #444;color:#fff;padding:12px 16px;border-radius:8px;font-size:14px;';
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') manualSelectPlayer(); });
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-primary btn-sm';
-    btn.style.marginTop = '8px';
-    btn.textContent = 'Continuar';
-    btn.onclick = manualSelectPlayer;
-    select.parentNode.appendChild(input);
-    select.parentNode.appendChild(btn);
-  }
-  // Check URL param for backwards compatibility
-  const params = new URLSearchParams(window.location.search);
-  const playerParam = params.get('player');
-  if (playerParam) {
-    const name = playerParam.charAt(0).toUpperCase() + playerParam.slice(1).toLowerCase();
-    select.value = name;
-    if (select.value === name) {
-      selectPlayer();
-    } else {
-      // Not in roster, set directly
-      selectedPlayer = name;
-      showPlayerUI(name);
-    }
-  }
-}
-
-function selectPlayer() {
-  const name = document.getElementById('playerSelect').value;
-  if (!name) return;
-  selectedPlayer = name;
-  showPlayerUI(name);
-}
-
-function manualSelectPlayer() {
-  const input = document.getElementById('playerManualInput');
-  const name = (input?.value || '').trim();
-  if (!name) return;
-  selectedPlayer = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-  showPlayerUI(selectedPlayer);
-}
-
-function showPlayerUI(name) {
-  document.getElementById('playerBanner').style.display = 'block';
-  document.getElementById('playerDisplayName').textContent = name;
-  document.getElementById('mainContent').style.display = 'block';
-  document.title = 'EK Droptimizer — ' + name;
+  const mains = roster.filter(p => p.isMain);
+  const lower = rawName.toLowerCase();
+  // Exact match
+  const exact = mains.find(p => (p.nm || '').toLowerCase() === lower);
+  if (exact) return exact.nm;
+  // Normalize accents for fuzzy match (e.g. "yazhi" matches "Yázhi")
+  const normalize = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const fuzzy = mains.find(p => normalize(p.nm || '') === normalize(rawName));
+  if (fuzzy) return fuzzy.nm;
+  // No match found - capitalize first letter
+  return rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
 }
 
 // ===== ENCOUNTER ID → BOSS NAME MAP =====
@@ -244,7 +175,6 @@ function extractBossFromDroptimizerItem(entry) {
 let extractedData = null;
 
 async function fetchReport() {
-  if (!selectedPlayer) { showStatus('err', 'Primero selecciona tu personaje.'); return; }
   const urlInput = document.getElementById('reportUrl').value.trim();
   const btn = document.getElementById('fetchBtn');
   if (!urlInput) { showStatus('err', 'Pega una URL de Raidbots.'); return; }
@@ -285,6 +215,15 @@ function parseManualJson() {
 function processRaidbotsData(data, reportId, reportUrl) {
   try {
     const baseDps = data.sim.players[0].collected_data.dps.mean;
+    const rawName = data.sim.players[0].name;
+    // Auto-detect player name from sim data, match to roster
+    const playerName = findRosterName(rawName);
+
+    // Show player banner
+    document.getElementById('playerBanner').style.display = 'block';
+    document.getElementById('playerDisplayName').textContent = playerName;
+    document.title = 'EK Droptimizer — ' + playerName;
+
     const profilesets = data.sim.profilesets.results;
     const dropItems = data.simbot?.meta?.rawFormData?.droptimizerItems || [];
     const itemLookup = {};
@@ -303,15 +242,14 @@ function processRaidbotsData(data, reportId, reportUrl) {
     upgrades.forEach(u => { const k = u.item.toLowerCase(); if (!best[k] || u.gain > best[k].gain) best[k] = u; });
     const deduped = Object.values(best).sort((a,b) => b.gain - a.gain);
 
-    const displayName = selectedPlayer;
-    extractedData = { player: displayName, baseDps: Math.round(baseDps), upgrades: deduped, reportUrl };
+    extractedData = { player: playerName, baseDps: Math.round(baseDps), upgrades: deduped, reportUrl };
     renderResults(extractedData);
     submitToBackend(extractedData);
-    showStatus('ok', deduped.length + ' upgrades encontrados para ' + displayName + '.');
+    showStatus('ok', deduped.length + ' upgrades encontrados para ' + playerName + '.');
   } catch(e) { showStatus('err', 'Error procesando datos: ' + e.message); }
 }
 
-// ===== SAVE TO SHARED LOCALSTORAGE =====
+// ===== SAVE TO SHARED LOCALSTORAGE + BACKEND =====
 function saveToSharedStorage(d) {
   try {
     const existing = JSON.parse(localStorage.getItem('ek_droptimizer') || '{}');
@@ -335,14 +273,10 @@ function saveToSharedStorage(d) {
 
 async function submitToBackend(d) {
   const statusEl = document.getElementById('backendStatus');
-  const saved = saveToSharedStorage(d);
+  saveToSharedStorage(d);
 
   if (!BACKEND_URL) {
-    if (saved) {
-      statusEl.innerHTML = '<div class="submit-status sent">Datos guardados. El Raid Leader puede verlos en el Loot Advisor.</div>';
-    } else {
-      statusEl.innerHTML = '<div class="submit-status failed">Error guardando datos localmente.</div>';
-    }
+    statusEl.innerHTML = '<div class="submit-status sent">Datos guardados localmente.</div>';
     return;
   }
   statusEl.innerHTML = '<div class="submit-status sending">Enviando al servidor...</div>';
@@ -353,14 +287,10 @@ async function submitToBackend(d) {
     });
     const result = await resp.json();
     if (result.ok) {
-      statusEl.innerHTML = '<div class="submit-status sent">Enviado al servidor. (' + result.upgradeCount + ' upgrades)</div>';
+      statusEl.innerHTML = '<div class="submit-status sent">Listo, ' + d.player + '. Tus datos fueron enviados. (' + result.upgradeCount + ' upgrades)</div>';
     } else { throw new Error(result.error); }
   } catch(e) {
-    if (saved) {
-      statusEl.innerHTML = '<div class="submit-status sent">Datos guardados localmente.</div>';
-    } else {
-      statusEl.innerHTML = '<div class="submit-status failed">Error: ' + e.message + '</div>';
-    }
+    statusEl.innerHTML = '<div class="submit-status failed">Error enviando: ' + e.message + '</div>';
   }
 }
 
@@ -376,13 +306,6 @@ function renderResults(d) {
   document.getElementById('resultBox').classList.add('show');
 }
 
-function copyCode() {
-  if (!extractedData) return;
-  const pairs = extractedData.upgrades.map(u => (u.boss && u.boss !== 'Unknown' ? u.boss + '>' : '') + u.item + ':' + u.gain);
-  const code = 'EK-DROP|' + extractedData.player + '|' + extractedData.baseDps + '|' + pairs.join(',');
-  navigator.clipboard.writeText(code).catch(() => {});
-}
-
 function showStatus(type, msg) {
   const el = document.getElementById('fetchStatus');
   el.className = 'status ' + type;
@@ -390,9 +313,6 @@ function showStatus(type, msg) {
 }
 
 document.getElementById('reportUrl')?.addEventListener('keydown', e => { if (e.key === 'Enter') fetchReport(); });
-
-// Init
-loadRoster();
 </script>
 </body>
 </html>
