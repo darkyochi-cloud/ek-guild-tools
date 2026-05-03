@@ -19,8 +19,10 @@ body { background:#0f0f23; color:#e0e0e0; font-family:'Segoe UI',sans-serif; min
 .card { background:#16213e; border:1px solid #333; border-radius:12px; padding:20px; margin-bottom:16px; }
 .card-title { color:#ffd700; font-size:16px; font-weight:bold; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
 .step-num { width:28px; height:28px; background:#a335ee; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:14px; color:#fff; flex-shrink:0; }
-input[type=url] { width:100%; background:#0d1b2a; border:1px solid #444; color:#fff; padding:12px 16px; border-radius:8px; font-size:14px; outline:none; }
-input:focus { border-color:#a335ee; }
+input[type=url],input[type=text] { width:100%; background:#0d1b2a; border:1px solid #444; color:#fff; padding:12px 16px; border-radius:8px; font-size:14px; outline:none; }
+select.player-select { width:100%; background:#0d1b2a; border:1px solid #444; color:#fff; padding:12px 16px; border-radius:8px; font-size:14px; outline:none; cursor:pointer; }
+select.player-select option { background:#0d1b2a; color:#fff; }
+input:focus,select:focus { border-color:#a335ee; }
 input::placeholder { color:#555; }
 .btn { border:none; padding:12px 24px; border-radius:8px; font-size:14px; font-weight:bold; cursor:pointer; transition:all 0.2s; }
 .btn:hover { transform:scale(1.03); }
@@ -42,8 +44,6 @@ input::placeholder { color:#555; }
 .top-upgrades td { padding:6px 8px; border-bottom:1px solid #1a1a2e; }
 .gain-val { color:#2ecc40; font-weight:bold; }
 .footer { color:#555; font-size:11px; text-align:center; padding:24px; }
-.no-player { text-align:center; padding:60px 20px; }
-.no-player h2 { color:#e74c3c; margin-bottom:12px; }
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
 .loading { animation:pulse 1s ease-in-out infinite; }
 .manual-section { margin-top:16px; }
@@ -73,18 +73,17 @@ input::placeholder { color:#555; }
 
 <div class="container">
 
-  <!-- No player error -->
-  <div class="no-player" id="noPlayerMsg" style="display:none;">
-    <h2>Link invalido</h2>
-    <p style="color:#888;">Este link necesita un parametro <code style="color:#ff8844;">?player=TuNombre</code></p>
-    <p style="color:#666;margin-top:8px;">Pide tu link personalizado al Raid Leader.</p>
+  <div class="card">
+    <div class="card-title"><div class="step-num">1</div> Selecciona tu personaje</div>
+    <select class="player-select" id="playerSelect" onchange="selectPlayer()">
+      <option value="">-- Elige tu personaje --</option>
+    </select>
   </div>
 
-  <!-- Main content -->
   <div id="mainContent" style="display:none;">
 
     <div class="card">
-      <div class="card-title"><div class="step-num">1</div> Corre tu Droptimizer</div>
+      <div class="card-title"><div class="step-num">2</div> Corre tu Droptimizer</div>
       <div style="color:#888;font-size:13px;line-height:1.6;margin-bottom:12px;">
         Ve a <a href="https://www.raidbots.com/simbot/droptimizer" target="_blank" style="color:#3498db;">Raidbots Droptimizer</a>,
         carga tu personaje, selecciona <b>Season 1 Raids &rarr; Mythic</b>, y corre la sim.
@@ -92,7 +91,7 @@ input::placeholder { color:#555; }
     </div>
 
     <div class="card">
-      <div class="card-title"><div class="step-num">2</div> Pega la URL de tu reporte</div>
+      <div class="card-title"><div class="step-num">3</div> Pega la URL de tu reporte</div>
       <input type="url" id="reportUrl" placeholder="https://www.raidbots.com/simbot/report/XXXXX..." autocomplete="off">
       <div style="display:flex; gap:8px; margin-top:12px;">
         <button class="btn btn-primary" id="fetchBtn" onclick="fetchReport()">🔍 Extraer y Enviar</button>
@@ -110,7 +109,6 @@ input::placeholder { color:#555; }
           Top: <span class="stat" id="resTop">—</span>
         </div>
       </div>
-      <!-- Backend submit status -->
       <div id="backendStatus"></div>
       <div class="top-upgrades" style="margin-top:12px;">
         <table>
@@ -118,15 +116,11 @@ input::placeholder { color:#555; }
           <tbody id="upgradeTable"></tbody>
         </table>
       </div>
-      <div style="margin-top:16px;">
-        <div style="color:#ffd700;font-size:13px;font-weight:bold;margin-bottom:6px;">📦 Backup: tu codigo para Discord</div>
-        <div class="code-area" id="codeOutput"></div>
-      </div>
     </div>
 
     <!-- Manual fallback -->
     <div class="card" id="manualCard" style="display:none;">
-      <div class="card-title">⚠️ Metodo Manual</div>
+      <div class="card-title">Metodo Manual</div>
       <div style="color:#888;font-size:13px;margin-bottom:8px;">
         Si el fetch fallo, abre esta URL en tu navegador, selecciona todo (Ctrl+A), copia (Ctrl+C) y pega aqui:
       </div>
@@ -140,43 +134,91 @@ input::placeholder { color:#555; }
   </div>
 </div>
 
-<div class="footer">Eternal Karma Droptimizer Submit v3.0</div>
+<div class="footer">Eternal Karma Droptimizer Submit v4.0</div>
 
 <script>
-// ============================================================
-// BACKEND URL — Replace with your Google Apps Script Web App URL
-// ============================================================
-const BACKEND_URL = '';  // <-- PASTE YOUR APPS SCRIPT URL HERE
+const BACKEND_URL = '';
 
-// ===== GET PLAYER NAME FROM URL PARAM =====
-const params = new URLSearchParams(window.location.search);
-const playerParam = params.get('player');
+// ===== ROSTER: load from localStorage (shared with advisor) =====
+let selectedPlayer = null;
 
-if (!playerParam) {
-  document.getElementById('noPlayerMsg').style.display = 'block';
-} else {
-  const playerName = playerParam.charAt(0).toUpperCase() + playerParam.slice(1).toLowerCase();
-  document.getElementById('playerBanner').style.display = 'block';
-  document.getElementById('playerDisplayName').textContent = playerName;
-  document.getElementById('mainContent').style.display = 'block';
-  document.title = 'EK Droptimizer — ' + playerName;
+function loadRoster() {
+  const select = document.getElementById('playerSelect');
+  const roster = JSON.parse(localStorage.getItem('ek_roster') || '[]');
+  // Get mains only, sorted by name
+  const mains = roster.filter(p => p.isMain).sort((a, b) => (a.nm || a.name || '').localeCompare(b.nm || b.name || ''));
+  if (mains.length > 0) {
+    mains.forEach(p => {
+      const name = p.nm || p.name;
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name + ' — ' + (p.cN || p.className || '') + ' ' + (p.sN || p.spec || '');
+      select.appendChild(opt);
+    });
+  } else {
+    // No roster in localStorage - allow manual text input
+    select.style.display = 'none';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = 'playerManualInput';
+    input.placeholder = 'Escribe tu nombre de personaje...';
+    input.style.cssText = 'width:100%;background:#0d1b2a;border:1px solid #444;color:#fff;padding:12px 16px;border-radius:8px;font-size:14px;';
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') manualSelectPlayer(); });
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary btn-sm';
+    btn.style.marginTop = '8px';
+    btn.textContent = 'Continuar';
+    btn.onclick = manualSelectPlayer;
+    select.parentNode.appendChild(input);
+    select.parentNode.appendChild(btn);
+  }
+  // Check URL param for backwards compatibility
+  const params = new URLSearchParams(window.location.search);
+  const playerParam = params.get('player');
+  if (playerParam) {
+    const name = playerParam.charAt(0).toUpperCase() + playerParam.slice(1).toLowerCase();
+    select.value = name;
+    if (select.value === name) {
+      selectPlayer();
+    } else {
+      // Not in roster, set directly
+      selectedPlayer = name;
+      showPlayerUI(name);
+    }
+  }
 }
 
-let extractedData = null;
+function selectPlayer() {
+  const name = document.getElementById('playerSelect').value;
+  if (!name) return;
+  selectedPlayer = name;
+  showPlayerUI(name);
+}
+
+function manualSelectPlayer() {
+  const input = document.getElementById('playerManualInput');
+  const name = (input?.value || '').trim();
+  if (!name) return;
+  selectedPlayer = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  showPlayerUI(selectedPlayer);
+}
+
+function showPlayerUI(name) {
+  document.getElementById('playerBanner').style.display = 'block';
+  document.getElementById('playerDisplayName').textContent = name;
+  document.getElementById('mainContent').style.display = 'block';
+  document.title = 'EK Droptimizer — ' + name;
+}
 
 // ===== ENCOUNTER ID → BOSS NAME MAP =====
-// IDs from Raidbots data.json (Journal Encounter IDs)
 const ENCOUNTER_MAP = {
-  // The Voidspire (instanceId: 1307)
   '2733': { boss: 'Imperator Averzian', raid: 'The Voidspire' },
   '2734': { boss: 'Vorasius', raid: 'The Voidspire' },
   '2735': { boss: 'Vaelgor & Ezzorak', raid: 'The Voidspire' },
   '2736': { boss: 'Fallen-King Salhadaar', raid: 'The Voidspire' },
   '2737': { boss: 'Lightblinded Vanguard', raid: 'The Voidspire' },
   '2738': { boss: 'Crown of the Cosmos', raid: 'The Voidspire' },
-  // The Dreamrift (instanceId: 1314)
   '2795': { boss: 'Chimaerus the Undreamt God', raid: 'The Dreamrift' },
-  // March on Quel'Danas (instanceId: 1308)
   '2739': { boss: "Belo'ren, Child of Al'ar", raid: "March on Quel'Danas" },
   '2740': { boss: 'Midnight Falls', raid: "March on Quel'Danas" }
 };
@@ -185,28 +227,24 @@ const INSTANCE_MAP = { '1307': 'The Voidspire', '1314': 'The Dreamrift', '1308':
 function extractBossFromProfilesetName(name) {
   if (!name) return { boss: 'Unknown', raid: 'Unknown' };
   const parts = name.split('/');
-  // Format: instanceId/encounterId/difficulty/itemId/ilvl/...
-  // encounterId is at index 1
   if (parts.length >= 2 && ENCOUNTER_MAP[parts[1]]) return ENCOUNTER_MAP[parts[1]];
-  // Fallback: try all segments
-  for (const p of parts) {
-    if (ENCOUNTER_MAP[p]) return ENCOUNTER_MAP[p];
-  }
+  for (const p of parts) { if (ENCOUNTER_MAP[p]) return ENCOUNTER_MAP[p]; }
   return { boss: 'Unknown', raid: 'Unknown' };
 }
 
 function extractBossFromDroptimizerItem(entry) {
-  // droptimizerItems have rich encounter data embedded
   const enc = entry?.item?.encounter;
   if (enc?.name) {
     const raid = entry?.item?.instance?.name || INSTANCE_MAP[entry?.item?.instanceId] || 'Unknown';
     return { boss: enc.name, raid };
   }
-  // Fallback to profileset name parsing
   return extractBossFromProfilesetName(entry?.id);
 }
 
+let extractedData = null;
+
 async function fetchReport() {
+  if (!selectedPlayer) { showStatus('err', 'Primero selecciona tu personaje.'); return; }
   const urlInput = document.getElementById('reportUrl').value.trim();
   const btn = document.getElementById('fetchBtn');
   if (!urlInput) { showStatus('err', 'Pega una URL de Raidbots.'); return; }
@@ -215,7 +253,7 @@ async function fetchReport() {
   const reportId = match[1];
   const dataUrl = 'https://www.raidbots.com/reports/' + reportId + '/data.json';
   btn.disabled = true;
-  btn.innerHTML = '<span class="loading">⏳ Extrayendo...</span>';
+  btn.innerHTML = '<span class="loading">Extrayendo...</span>';
   showStatus('info', 'Conectando con Raidbots...');
   try {
     const resp = await fetch(dataUrl);
@@ -261,36 +299,25 @@ function processRaidbotsData(data, reportId, reportUrl) {
       return { item: info.name || '?', slot: info.slot || '?', ilvl: info.ilvl || 0, gain: Math.round(p.mean - baseDps), boss: bossInfo.boss, raid: bossInfo.raid };
     }).filter(r => r.gain > 0).sort((a,b) => b.gain - a.gain);
 
-    // Deduplicate: keep best gain per item
     const best = {};
     upgrades.forEach(u => { const k = u.item.toLowerCase(); if (!best[k] || u.gain > best[k].gain) best[k] = u; });
     const deduped = Object.values(best).sort((a,b) => b.gain - a.gain);
 
-    const displayName = playerParam.charAt(0).toUpperCase() + playerParam.slice(1).toLowerCase();
-    // v2 format includes boss: Boss>Item:Gain
-    const pairs = deduped.map(u => (u.boss && u.boss !== 'Unknown' ? u.boss + '>' : '') + u.item + ':' + u.gain);
-    const code = 'EK-DROP|' + displayName + '|' + Math.round(baseDps) + '|' + pairs.join(',');
-
-    extractedData = { player: displayName, baseDps: Math.round(baseDps), upgrades: deduped, code, reportUrl };
+    const displayName = selectedPlayer;
+    extractedData = { player: displayName, baseDps: Math.round(baseDps), upgrades: deduped, reportUrl };
     renderResults(extractedData);
-
-    // Auto-submit to backend
     submitToBackend(extractedData);
-
-    showStatus('ok', '✅ ' + deduped.length + ' upgrades encontrados.');
+    showStatus('ok', deduped.length + ' upgrades encontrados para ' + displayName + '.');
   } catch(e) { showStatus('err', 'Error procesando datos: ' + e.message); }
 }
 
 // ===== SAVE TO SHARED LOCALSTORAGE =====
-// Both submit page and advisor are on the same GitHub Pages domain,
-// so they share localStorage. This makes data instantly available.
 function saveToSharedStorage(d) {
   try {
     const existing = JSON.parse(localStorage.getItem('ek_droptimizer') || '{}');
     if (!existing[d.player]) existing[d.player] = {};
     existing[d.player]._baseDps = d.baseDps;
     existing[d.player]._submittedAt = new Date().toISOString();
-    // Store each upgrade keyed by lowercase item name
     const best = {};
     d.upgrades.forEach(u => {
       const key = (u.item || '').toLowerCase();
@@ -308,37 +335,32 @@ function saveToSharedStorage(d) {
 
 async function submitToBackend(d) {
   const statusEl = document.getElementById('backendStatus');
-  // Always save to shared localStorage first (works on same domain)
   const saved = saveToSharedStorage(d);
 
   if (!BACKEND_URL) {
     if (saved) {
-      statusEl.innerHTML = '<div class="submit-status sent">✅ Datos guardados. El Raid Leader puede verlos en el Loot Advisor → Boss Priority.</div>';
+      statusEl.innerHTML = '<div class="submit-status sent">Datos guardados. El Raid Leader puede verlos en el Loot Advisor.</div>';
     } else {
-      statusEl.innerHTML = '<div class="submit-status sent">📦 Datos extraidos. Copia el codigo de abajo y pegalo en Discord #droptimizer.</div>';
+      statusEl.innerHTML = '<div class="submit-status failed">Error guardando datos localmente.</div>';
     }
     return;
   }
-  statusEl.innerHTML = '<div class="submit-status sending">⏳ Enviando al servidor de la guild...</div>';
+  statusEl.innerHTML = '<div class="submit-status sending">Enviando al servidor...</div>';
   try {
     const resp = await fetch(BACKEND_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({
-        player: d.player,
-        baseDps: d.baseDps,
-        upgrades: d.upgrades,
-        reportUrl: d.reportUrl || ''
-      })
+      method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ player: d.player, baseDps: d.baseDps, upgrades: d.upgrades, reportUrl: d.reportUrl || '' })
     });
     const result = await resp.json();
     if (result.ok) {
-      statusEl.innerHTML = '<div class="submit-status sent">✅ Enviado al servidor. El Raid Leader ya puede ver tus datos. (' + result.upgradeCount + ' upgrades)</div>';
-    } else {
-      throw new Error(result.error || 'Unknown error');
-    }
+      statusEl.innerHTML = '<div class="submit-status sent">Enviado al servidor. (' + result.upgradeCount + ' upgrades)</div>';
+    } else { throw new Error(result.error); }
   } catch(e) {
-    statusEl.innerHTML = '<div class="submit-status failed">⚠️ No se pudo enviar al servidor, pero los datos se guardaron localmente. El Raid Leader puede verlos si usa este mismo navegador.</div>';
+    if (saved) {
+      statusEl.innerHTML = '<div class="submit-status sent">Datos guardados localmente.</div>';
+    } else {
+      statusEl.innerHTML = '<div class="submit-status failed">Error: ' + e.message + '</div>';
+    }
   }
 }
 
@@ -346,29 +368,19 @@ function renderResults(d) {
   document.getElementById('resBase').textContent = d.baseDps.toLocaleString();
   document.getElementById('resCount').textContent = d.upgrades.length;
   document.getElementById('resTop').textContent = d.upgrades[0] ? '+' + d.upgrades[0].gain.toLocaleString() + ' (' + d.upgrades[0].item + ')' : '—';
-
   const tbody = document.getElementById('upgradeTable');
   tbody.innerHTML = d.upgrades.slice(0, 15).map((u, i) =>
     '<tr><td style="color:#666;">' + (i+1) + '</td><td>' + u.item + '</td><td style="color:#ff8844;font-size:11px;">' + (u.boss || '?') + '</td><td style="color:#888;">' + u.slot + '</td><td class="gain-val">+' + u.gain.toLocaleString() + '</td></tr>'
   ).join('');
-  if (d.upgrades.length > 15) tbody.innerHTML += '<tr><td colspan="4" style="color:#555;text-align:center;">... y ' + (d.upgrades.length - 15) + ' mas</td></tr>';
-
-  document.getElementById('codeOutput').textContent = d.code;
+  if (d.upgrades.length > 15) tbody.innerHTML += '<tr><td colspan="5" style="color:#555;text-align:center;">... y ' + (d.upgrades.length - 15) + ' mas</td></tr>';
   document.getElementById('resultBox').classList.add('show');
 }
 
 function copyCode() {
   if (!extractedData) return;
-  navigator.clipboard.writeText(extractedData.code).then(() => {
-    document.querySelector('.copy-btn').textContent = '✅ Copiado!';
-    setTimeout(() => { document.querySelector('.copy-btn').textContent = '📋 Copiar Codigo'; }, 2000);
-  }).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = extractedData.code;
-    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-    document.querySelector('.copy-btn').textContent = '✅ Copiado!';
-    setTimeout(() => { document.querySelector('.copy-btn').textContent = '📋 Copiar Codigo'; }, 2000);
-  });
+  const pairs = extractedData.upgrades.map(u => (u.boss && u.boss !== 'Unknown' ? u.boss + '>' : '') + u.item + ':' + u.gain);
+  const code = 'EK-DROP|' + extractedData.player + '|' + extractedData.baseDps + '|' + pairs.join(',');
+  navigator.clipboard.writeText(code).catch(() => {});
 }
 
 function showStatus(type, msg) {
@@ -378,6 +390,9 @@ function showStatus(type, msg) {
 }
 
 document.getElementById('reportUrl')?.addEventListener('keydown', e => { if (e.key === 'Enter') fetchReport(); });
+
+// Init
+loadRoster();
 </script>
 </body>
 </html>

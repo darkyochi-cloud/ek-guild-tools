@@ -1322,57 +1322,92 @@ window.quickImportBP = async function() {
 };
 
 // ===== BOSS PRIORITY RENDERING =====
+const BP_STALE_DAYS = 10; // Data older than this is considered outdated
+
 function renderBossPriority() {
   const gridEl = document.getElementById('bossPriorityGrid');
   const summaryEl = document.getElementById('bossRosterSummary');
   if (!gridEl) return;
 
-  const raidFilter = document.getElementById('bossRaidFilter')?.value || 'all';
-  const selected = window.roster.filter(p => window.selectedPlayers.has(p.uid || p.nm));
+  // Reload droptimizer data from localStorage (may have been updated by submit page)
+  window.droptimizerData = JSON.parse(localStorage.getItem('ek_droptimizer') || '{}');
 
-  if (!selected.length) {
-    gridEl.innerHTML = '<div style="color:#666;text-align:center;padding:40px;">Selecciona jugadores en el tab Roster primero.<br><span style="font-size:11px;">Roster: ' + window.roster.length + ' jugadores cargados, ' + window.selectedPlayers.size + ' seleccionados.</span></div>';
+  const raidFilter = document.getElementById('bossRaidFilter')?.value || 'all';
+
+  // Use ALL mains from roster (not just selected players)
+  const allMains = window.roster.filter(p => p.isMain);
+  if (!allMains.length) {
+    gridEl.innerHTML = '<div style="color:#666;text-align:center;padding:40px;">No hay roster cargado. Ve al tab Roster y carga el roster primero.</div>';
     summaryEl.innerHTML = '';
     return;
   }
 
-  // Count how many selected players have droptimizer data
-  let playersWithDropData = 0;
-  let totalDropItems = 0;
-  selected.forEach(p => {
+  // Classify mains: submitted (fresh), stale (>10 days), missing (no data)
+  const now = new Date();
+  const freshPlayers = [];  // Have data, < 10 days old
+  const stalePlayers = [];  // Have data, >= 10 days old
+  const missingPlayers = []; // No data at all
+
+  allMains.forEach(p => {
     const d = window.droptimizerData[p.nm];
-    if (d) {
-      const items = Object.keys(d).filter(k => !k.startsWith('_'));
-      if (items.length > 0) { playersWithDropData++; totalDropItems += items.length; }
+    const hasItems = d && Object.keys(d).filter(k => !k.startsWith('_')).length > 0;
+    if (!hasItems) {
+      missingPlayers.push(p);
+      return;
+    }
+    const submittedAt = d._submittedAt ? new Date(d._submittedAt) : null;
+    const daysOld = submittedAt ? (now - submittedAt) / (1000 * 60 * 60 * 24) : 999;
+    if (daysOld > BP_STALE_DAYS) {
+      stalePlayers.push({ ...p, daysOld: Math.floor(daysOld), submittedAt });
+    } else {
+      freshPlayers.push({ ...p, daysOld: Math.floor(daysOld), submittedAt });
     }
   });
 
-  if (playersWithDropData === 0) {
-    // Show diagnostic info
-    const allDropPlayers = Object.keys(window.droptimizerData).filter(k => {
-      const d = window.droptimizerData[k];
-      return d && Object.keys(d).filter(j => !j.startsWith('_')).length > 0;
-    });
-    let diagHtml = '<div style="color:#666;text-align:center;padding:40px;">';
-    diagHtml += '<div style="font-size:16px;margin-bottom:12px;">No hay datos de Droptimizer para los jugadores seleccionados.</div>';
-    diagHtml += '<div style="font-size:12px;color:#888;margin-bottom:8px;">Jugadores seleccionados: <b style="color:#ffd700;">' + selected.length + '</b></div>';
-    if (allDropPlayers.length > 0) {
-      diagHtml += '<div style="font-size:12px;color:#888;">Droptimizer disponible para: <b style="color:#2ecc40;">' + allDropPlayers.join(', ') + '</b></div>';
-      diagHtml += '<div style="font-size:11px;color:#ff8844;margin-top:8px;">Los nombres deben coincidir exactamente con el roster.</div>';
-    } else {
-      diagHtml += '<div style="font-size:12px;color:#ff8844;">No hay datos de Droptimizer cargados en esta sesion.</div>';
-      diagHtml += '<div style="font-size:11px;color:#888;margin-top:8px;">Importa datos: pega codigos EK-DROP o URLs de Raidbots en el tab "Boss & Loot".</div>';
+  // Render status panel (who's missing / stale)
+  const totalMains = allMains.length;
+  const freshCount = freshPlayers.length;
+  let statusHtml = '<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;font-size:13px;">';
+  statusHtml += '<span style="color:#888;">Mains: <b style="color:#ffd700;">' + totalMains + '</b></span>';
+  statusHtml += '<span style="color:#888;">Actualizados: <b style="color:#2ecc40;">' + freshCount + '</b></span>';
+  statusHtml += '<span style="color:#888;">Viejos (+' + BP_STALE_DAYS + 'd): <b style="color:#ff8844;">' + stalePlayers.length + '</b></span>';
+  statusHtml += '<span style="color:#888;">Sin datos: <b style="color:#e74c3c;">' + missingPlayers.length + '</b></span>';
+  statusHtml += '</div>';
+
+  if (missingPlayers.length > 0 || stalePlayers.length > 0) {
+    statusHtml += '<div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;">';
+    if (missingPlayers.length > 0) {
+      statusHtml += '<div style="margin-bottom:8px;"><span style="color:#e74c3c;font-weight:bold;">Sin droptimizer:</span> ';
+      statusHtml += missingPlayers.map(p => {
+        const cc = (window.SD[p.cN] || {}).color || '#888';
+        return '<span style="color:' + cc + ';">' + p.nm + '</span>';
+      }).join(', ');
+      statusHtml += '</div>';
     }
-    diagHtml += '</div>';
-    gridEl.innerHTML = diagHtml;
-    summaryEl.innerHTML = '';
+    if (stalePlayers.length > 0) {
+      statusHtml += '<div><span style="color:#ff8844;font-weight:bold;">Necesitan actualizar:</span> ';
+      statusHtml += stalePlayers.map(p => {
+        const cc = (window.SD[p.cN] || {}).color || '#888';
+        return '<span style="color:' + cc + ';" title="' + p.daysOld + ' dias">' + p.nm + ' (' + p.daysOld + 'd)</span>';
+      }).join(', ');
+      statusHtml += '</div>';
+    }
+    statusHtml += '</div>';
+  }
+
+  // Only use fresh + stale players for the boss matrix (all who have data)
+  const playersForMatrix = [...freshPlayers, ...stalePlayers];
+
+  if (!playersForMatrix.length) {
+    summaryEl.innerHTML = statusHtml;
+    gridEl.innerHTML = '<div style="color:#666;text-align:center;padding:40px;">Ningun main tiene datos de Droptimizer. Los raiders deben subir su droptimizer en la pagina de submit.</div>';
     return;
   }
 
   // Build boss → player → totalGain map
-  const bossData = {}; // { bossName: { raid, players: { playerName: { totalGain, baseDps, items: [] } } } }
+  const bossData = {};
 
-  selected.forEach(p => {
+  playersForMatrix.forEach(p => {
     const name = p.nm;
     const dropData = window.droptimizerData[name];
     if (!dropData) return;
@@ -1392,12 +1427,6 @@ function renderBossPriority() {
     });
   });
 
-  if (!Object.keys(bossData).length) {
-    gridEl.innerHTML = '<div style="color:#666;text-align:center;padding:40px;">Datos de Droptimizer encontrados (' + playersWithDropData + ' jugadores, ' + totalDropItems + ' items) pero no se pudieron mapear a bosses.<br><span style="font-size:11px;color:#888;">Reimporta datos usando el submit page actualizado o pega URLs de Raidbots directamente.</span></div>';
-    summaryEl.innerHTML = '';
-    return;
-  }
-
   // Sort bosses by total roster value
   const bossRanking = Object.entries(bossData).map(([boss, data]) => {
     let totalValue = 0, playerCount = 0;
@@ -1407,29 +1436,18 @@ function renderBossPriority() {
     return { boss, raid: data.raid, totalValue, playerCount, players: data.players };
   }).sort((a, b) => b.totalValue - a.totalValue);
 
-  // Render summary cards (top bosses by value)
-  let summaryHtml = '<div class="bp-summary-grid">';
-  bossRanking.slice(0, 6).forEach((b, i) => {
-    summaryHtml += '<div class="bp-summary-card">';
-    summaryHtml += '<div class="bp-boss-rank">#' + (i + 1) + '</div>';
-    summaryHtml += '<div class="bp-boss-info"><div class="bp-boss-name">' + b.boss + '</div><div class="bp-boss-raid">' + b.raid + '</div></div>';
-    summaryHtml += '<div class="bp-boss-value"><div class="bp-boss-total">+' + b.totalValue.toLocaleString() + ' DPS</div>';
-    summaryHtml += '<div class="bp-boss-players">' + b.playerCount + ' raiders lo necesitan</div></div>';
-    summaryHtml += '</div>';
+  // Render summary cards
+  let topHtml = '<div class="bp-summary-grid">';
+  bossRanking.filter(b => b.boss !== 'Unknown').slice(0, 6).forEach((b, i) => {
+    topHtml += '<div class="bp-summary-card">';
+    topHtml += '<div class="bp-boss-rank">#' + (i + 1) + '</div>';
+    topHtml += '<div class="bp-boss-info"><div class="bp-boss-name">' + b.boss + '</div><div class="bp-boss-raid">' + b.raid + '</div></div>';
+    topHtml += '<div class="bp-boss-value"><div class="bp-boss-total">+' + b.totalValue.toLocaleString() + ' DPS</div>';
+    topHtml += '<div class="bp-boss-players">' + b.playerCount + ' raiders</div></div>';
+    topHtml += '</div>';
   });
-  summaryHtml += '</div>';
-  summaryEl.innerHTML = summaryHtml;
-
-  // Get all players with droptimizer data
-  const playersWithData = selected.filter(p => {
-    const d = window.droptimizerData[p.nm];
-    return d && Object.keys(d).filter(k => !k.startsWith('_')).length > 0;
-  });
-
-  if (!playersWithData.length) {
-    gridEl.innerHTML = '<div style="color:#666;text-align:center;padding:40px;">Ningun jugador seleccionado tiene datos de Droptimizer.</div>';
-    return;
-  }
+  topHtml += '</div>';
+  summaryEl.innerHTML = statusHtml + topHtml;
 
   // Find max gain for color scaling
   let maxGain = 0;
@@ -1440,17 +1458,20 @@ function renderBossPriority() {
   // Render matrix table
   let html = '<div style="overflow-x:auto;"><table class="boss-priority-table">';
   html += '<thead><tr><th>Boss</th>';
-  playersWithData.forEach(p => {
+  playersForMatrix.forEach(p => {
     const cc = (window.SD[p.cN] || {}).color || '#fff';
     const shortName = p.nm.length > 10 ? p.nm.substring(0, 9) + '..' : p.nm;
-    html += '<th style="font-size:11px;min-width:60px;"><span style="color:' + cc + ';">' + shortName + '</span></th>';
+    const staleFlag = p.daysOld > BP_STALE_DAYS ? ' style="opacity:0.5;"' : '';
+    html += '<th style="font-size:11px;min-width:60px;"' + staleFlag + '><span style="color:' + cc + ';">' + shortName + '</span>';
+    if (p.daysOld > BP_STALE_DAYS) html += '<div style="color:#ff8844;font-size:9px;">' + p.daysOld + 'd</div>';
+    html += '</th>';
   });
-  html += '<th style="color:#2ecc40;">Total Roster</th></tr></thead><tbody>';
+  html += '<th style="color:#2ecc40;">Total</th></tr></thead><tbody>';
 
-  bossRanking.forEach(b => {
+  bossRanking.filter(b => b.boss !== 'Unknown').forEach(b => {
     html += '<tr>';
     html += '<td class="bp-boss-cell"><div>' + b.boss + '</div><div class="bp-raid-label">' + b.raid + '</div></td>';
-    playersWithData.forEach(p => {
+    playersForMatrix.forEach(p => {
       const pd = b.players[p.nm];
       if (!pd || pd.totalGain <= 0) {
         html += '<td><span class="bp-cell bp-cell-none">—</span></td>';
